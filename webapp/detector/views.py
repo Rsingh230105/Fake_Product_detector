@@ -20,8 +20,8 @@ from django.db import transaction
 import logging
 
 from .models import (CustomUser, UserProfile, FoodProduct, FoodImage, 
-                    Advertisement, GalleryItem, MediaItem, UserActivity)
-from .forms import CustomUserRegistrationForm, CustomUserLoginForm, UserProfileForm, CustomUserUpdateForm
+                    Advertisement, GalleryItem, MediaItem, UserActivity, PasswordResetToken)
+from .forms import CustomUserRegistrationForm, CustomUserLoginForm, UserProfileForm, CustomUserUpdateForm, MediaItemForm, AdvertisementForm, GalleryItemForm
 from .serializers import FoodProductSerializer, FoodImageSerializer
 
 logger = logging.getLogger(__name__)
@@ -128,6 +128,142 @@ class LoginView(View):
         
         return render(request, self.template_name, {'form': form})
 
+class ForgotPasswordView(View):
+    """Forgot password view"""
+    template_name = 'auth/forgot_password.html'
+
+    def get(self, request):
+        if request.user.is_authenticated:
+            return redirect('detector:dashboard')
+        return render(request, self.template_name)
+
+    def post(self, request):
+        if request.user.is_authenticated:
+            return redirect('detector:dashboard')
+        
+        email = request.POST.get('email', '').strip()
+        if not email:
+            messages.error(request, 'Please enter your email address.')
+            return render(request, self.template_name)
+        
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            # Don't reveal if email exists or not for security
+            messages.success(request, 'If an account with this email exists, a password reset link has been sent.')
+            return render(request, self.template_name)
+        
+        # Generate token
+        import secrets
+        token = secrets.token_urlsafe(32)
+        expires_at = timezone.now() + timezone.timedelta(minutes=15)
+        
+        # Save token
+        PasswordResetToken.objects.create(
+            user=user,
+            token=token,
+            expires_at=expires_at
+        )
+        
+        # Send email
+        from django.core.mail import send_mail
+        from django.conf import settings
+        
+        reset_url = request.build_absolute_uri(f'/reset-password/{token}/')
+        subject = 'Password Reset Request'
+        message = f'''
+        Hi {user.first_name},
+
+        You requested a password reset for your account.
+
+        Click the link below to reset your password:
+        {reset_url}
+
+        This link will expire in 15 minutes.
+
+        If you didn't request this, please ignore this email.
+
+        Best regards,
+        Food Detection Team
+        '''
+        
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+            )
+            messages.success(request, 'If an account with this email exists, a password reset link has been sent.')
+        except Exception as e:
+            logger.error(f"Failed to send password reset email: {str(e)}")
+            messages.error(request, 'Failed to send reset email. Please try again later.')
+        
+        return render(request, self.template_name)
+
+class ResetPasswordView(View):
+    """Reset password view"""
+    template_name = 'auth/reset_password.html'
+
+    def get(self, request, token):
+        if request.user.is_authenticated:
+            return redirect('detector:dashboard')
+        
+        try:
+            reset_token = PasswordResetToken.objects.get(token=token, used=False)
+            if reset_token.is_expired:
+                messages.error(request, 'This reset link has expired. Please request a new one.')
+                return redirect('detector:forgot_password')
+        except PasswordResetToken.DoesNotExist:
+            messages.error(request, 'Invalid reset link.')
+            return redirect('detector:forgot_password')
+        
+        return render(request, self.template_name, {'token': token})
+
+    def post(self, request, token):
+        if request.user.is_authenticated:
+            return redirect('detector:dashboard')
+        
+        password = request.POST.get('password', '')
+        confirm_password = request.POST.get('confirm_password', '')
+        
+        try:
+            reset_token = PasswordResetToken.objects.get(token=token, used=False)
+            if reset_token.is_expired:
+                messages.error(request, 'This reset link has expired. Please request a new one.')
+                return redirect('detector:forgot_password')
+        except PasswordResetToken.DoesNotExist:
+            messages.error(request, 'Invalid reset link.')
+            return redirect('detector:forgot_password')
+        
+        if not password:
+            messages.error(request, 'Please enter a new password.')
+            return render(request, self.template_name, {'token': token})
+        
+        if password != confirm_password:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, self.template_name, {'token': token})
+        
+        if len(password) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+            return render(request, self.template_name, {'token': token})
+        
+        # Update password
+        user = reset_token.user
+        user.set_password(password)
+        user.save()
+        
+        # Mark token as used
+        reset_token.used = True
+        reset_token.save()
+        
+        # Log activity
+        log_user_activity(user, 'password_reset', 'Password reset successfully', request)
+        
+        messages.success(request, 'Password reset successfully! You can now log in with your new password.')
+        return redirect('detector:login')
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     """User dashboard view"""
     template_name = 'detector/dashboard.html'
@@ -139,6 +275,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         # Get user's recent food products
         recent_products = FoodProduct.objects.filter(user=user).order_by('-created_at')[:5]
+        
+        # Convert confidence to percentage for display
+        for product in recent_products:
+            if product.overall_confidence is not None:
+                product.display_confidence = round(product.overall_confidence * 100, 1)
         
         # Get user statistics
         total_analyses = FoodProduct.objects.filter(user=user).count()
@@ -231,6 +372,11 @@ class AnalysesView(LoginRequiredMixin, TemplateView):
         paginator = Paginator(products, 10)  # 10 items per page
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
+        
+        # Convert confidence to percentage for display
+        for product in page_obj:
+            if product.overall_confidence is not None:
+                product.display_confidence = round(product.overall_confidence * 100, 1)
         
         context.update({
             'products': page_obj,

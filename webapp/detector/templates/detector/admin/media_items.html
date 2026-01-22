@@ -247,7 +247,7 @@
 
 <script>
 function rejectMedia(mediaId) {
-    document.getElementById('rejectForm').action = `/admin/media/${mediaId}/approve/`;
+    document.getElementById('rejectForm').action = `/media-admin/media/${mediaId}/approve/`;
     document.getElementById('rejectModal').classList.remove('hidden');
 }
 

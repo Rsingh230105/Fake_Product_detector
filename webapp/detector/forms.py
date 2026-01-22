@@ -177,7 +177,7 @@ class MediaItemForm(forms.ModelForm):
 
     class Meta:
         model = MediaItem
-        fields = ['title', 'description', 'file', 'media_type', 'tags']
+        fields = ['title', 'description', 'file', 'media_type']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',

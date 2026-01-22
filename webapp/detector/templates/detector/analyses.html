@@ -78,7 +78,7 @@
                                 <!-- Confidence -->
                                 {% if product.overall_confidence %}
                                     <div class="text-right">
-                                        <div class="text-sm font-medium text-gray-900">{{ product.overall_confidence|floatformat:1 }}%</div>
+                                        <div class="text-sm font-medium text-gray-900">{{ product.display_confidence }}%</div>
                                         <div class="text-xs text-gray-500">Confidence</div>
                                     </div>
                                 {% endif %}

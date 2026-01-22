@@ -8,7 +8,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Welcome back, {{ user.first_name }}!</h1>
+            <h1 class="text-3xl font-bold text-gray-900">Welcome, {{ user.first_name }}!</h1>
             <p class="mt-2 text-gray-600">Here's your product analysis dashboard</p>
         </div>
 
@@ -121,7 +121,7 @@
                                             Fake
                                         </span>
                                     {% endif %}
-                                    <span class="ml-2 text-sm text-gray-500">{{ product.overall_confidence|floatformat:1 }}%</span>
+                                    <span class="ml-2 text-sm text-gray-500">{{ product.display_confidence }}%</span>
                                 </div>
                             </div>
                             {% endfor %}
