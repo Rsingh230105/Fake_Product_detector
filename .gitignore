@@ -176,11 +176,20 @@ temp/
 # Secrets and credentials
 secrets.json
 credentials.json
+*.env.local
+.env.*.local
+
+# Internal documentation (development only)
 ADMIN_CREDENTIALS.txt
-GOOGLE_OAUTH_SETUP.md
+COMPLETION_SUMMARY.md
 PROJECT_STATUS_REPORT.txt
 TERMINAL_FIX.md
 TERMINAL_ISSUE_RESOLVED.md
+
+# Local development scripts
+PUSH_TO_GITHUB.bat
+run_server.bat
+*.bat
 
 # Build artifacts
 *.tar.gz

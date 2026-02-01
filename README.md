@@ -238,7 +238,7 @@ For questions or contributions, please open an issue or submit a pull request.
 - TailwindCSS
 
 ## Contributors
-- [Rajendra Singh]
+- [Rajendra Singh, Raj Bhayal, Narayan Yaduwanshi, Rahul Panwar]
 
 ## License
 [Your chosen license]
