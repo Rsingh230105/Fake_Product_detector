@@ -20,7 +20,7 @@ from django.db import transaction
 import logging
 
 from .models import (CustomUser, UserProfile, FoodProduct, FoodImage, 
-                    Advertisement, GalleryItem, MediaItem, UserActivity, PasswordResetToken)
+                    Advertisement, GalleryItem, MediaItem, UserActivity, PasswordResetToken, UserFeedback)
 from .forms import CustomUserRegistrationForm, CustomUserLoginForm, UserProfileForm, CustomUserUpdateForm, MediaItemForm, AdvertisementForm, GalleryItemForm
 from .serializers import FoodProductSerializer, FoodImageSerializer
 
@@ -586,54 +586,125 @@ class FoodDetectorView(APIView):
             # Create product with user association if authenticated
             user = request.user if request.user.is_authenticated else None
             
-            serializer = FoodProductSerializer(data={
-                'brand_name': brand_name,
-                'uploaded_images': images,
-                'view_types': view_types,
-                'user': user.id if user else None
-            })
+            # Create product instance
+            product = FoodProduct.objects.create(
+                brand_name=brand_name,
+                user=user
+            )
 
-            if serializer.is_valid():
-                product = serializer.save()
+            # Save images and prepare for analysis
+            image_data = {}
+            for i, (image_file, view_type) in enumerate(zip(images, view_types)):
+                # Create FoodImage instance
+                food_image = FoodImage.objects.create(
+                    product=product,
+                    image=image_file,
+                    view_type=view_type,
+                    file_size=image_file.size
+                )
                 
-                # Log analysis activity
-                if user:
-                    log_user_activity(user, 'analysis', f'Analyzed product: {brand_name}', request)
+                # Read image data for ML processing
+                image_file.seek(0)
+                image_data[view_type] = image_file.read()
+                image_file.seek(0)  # Reset pointer for Django to save the file
 
-                # Simulate ML processing (replace with actual ML logic)
-                from random import random, choice
-                predictions = ['Real', 'Fake']
+            # Process images with detailed analysis
+            from .utils.ml_utils import process_product_images
+            from .utils.report_generator import generate_user_friendly_report
+            
+            analysis_result = process_product_images(image_data, brand_name)
+            
+            # Generate user-friendly report
+            user_report = generate_user_friendly_report(analysis_result)
+            
+            # Update product with detailed analysis results
+            product.final_prediction = analysis_result['final_status']
+            product.overall_confidence = analysis_result['final_score'] / 100  # Convert to 0-1 scale
+            product.processing_time = analysis_result['processing_time']
+            
+            # Save component scores
+            product.barcode_score = analysis_result['component_scores']['barcode_score']
+            product.logo_score = analysis_result['component_scores']['logo_score']
+            product.ocr_score = analysis_result['component_scores']['ocr_score']
+            product.packaging_score = analysis_result['component_scores']['packaging_score']
+            product.final_score = analysis_result['final_score']
+            
+            # Save detailed analysis and failure reasons
+            product.detailed_analysis = analysis_result['detailed_analysis']
+            product.failure_reasons = analysis_result['failure_reasons']
+            product.user_report = user_report  # Store user-friendly report
+            
+            # Set risk level based on final score
+            if analysis_result['final_score'] >= 70:
+                product.risk_level = 'low'
+            elif analysis_result['final_score'] >= 40:
+                product.risk_level = 'medium'
+            else:
+                product.risk_level = 'high'
+            
+            product.save()
+            
+            # Log analysis activity
+            if user:
+                log_user_activity(user, 'analysis', f'Analyzed product: {brand_name}', request)
 
-                overall_confidence = 0
-                predictions_count = {'Real': 0, 'Fake': 0}
+            # Return role-based response
+            if request.user.is_authenticated and request.user.is_staff:
+                # Admin: Redirect to admin report
+                response_data = {
+                    'id': product.id,
+                    'redirect': 'admin',
+                    'admin_url': f'/admin-report/{product.id}/'
+                }
+            else:
+                # User: Redirect to simple result
+                response_data = {
+                    'id': product.id,
+                    'brand_name': product.brand_name,
+                    'status': 'REAL' if product.final_prediction == 'Real' else 'FAKE'
+                }
 
-                for image in product.images.all():
-                    pred = choice(predictions)
-                    conf = random() * 0.5 + 0.5
-                    image.prediction = pred
-                    image.confidence = conf
-                    image.detected_text = f"Sample text for {image.get_view_type_display()}"
-                    image.save()
-
-                    predictions_count[pred] += 1
-                    overall_confidence += conf
-
-                total_images = len(product.images.all())
-                final_pred = 'Real' if predictions_count['Real'] > predictions_count['Fake'] else 'Fake'
-                overall_conf = overall_confidence / total_images if total_images > 0 else 0
-
-                product.final_prediction = final_pred
-                product.overall_confidence = overall_conf
-                product.save()
-
-                return Response(FoodProductSerializer(product).data, status=status.HTTP_201_CREATED)
-
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             logger.error(f"Error processing food detection request: {str(e)}")
             return Response({'error': 'Internal server error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+class ReportIssueView(APIView):
+    """API endpoint for users to report issues with analysis results"""
+    
+    def post(self, request):
+        try:
+            if not request.user.is_authenticated:
+                return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            product_id = request.data.get('product_id')
+            reason = request.data.get('reason', '').strip()
+            
+            if not product_id or not reason:
+                return Response({'error': 'Product ID and reason are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                product = FoodProduct.objects.get(id=product_id)
+            except FoodProduct.DoesNotExist:
+                return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Create feedback entry
+            UserFeedback.objects.create(
+                user=request.user,
+                product=product,
+                reason=reason
+            )
+            
+            # Log activity
+            log_user_activity(request.user, 'feedback', f'Reported issue for product: {product.brand_name}', request)
+            
+            return Response({'message': 'Feedback submitted successfully'}, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error submitting feedback: {str(e)}")
+            return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Custom Admin Interface Views
 
@@ -934,7 +1005,81 @@ class GalleryItemDeleteView(AdminRequiredMixin, View):
         return redirect('detector:admin_gallery')
 
 
-# Public Media Display Views
+class SimpleResultView(TemplateView):
+    """Simple user-facing result view (REAL/FAKE only)"""
+    template_name = 'detector/simple_result.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Redirect admins to admin report instead
+        if request.user.is_staff:
+            from django.shortcuts import redirect
+            from django.urls import reverse
+            product_id = kwargs.get('product_id')
+            return redirect(reverse('detector:admin_analysis_report', kwargs={'product_id': product_id}))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        product_id = kwargs.get('product_id')
+        
+        try:
+            product = FoodProduct.objects.get(id=product_id)
+            if product.user and self.request.user != product.user:
+                messages.error(self.request, "You don't have permission to view this analysis")
+                context['error'] = True
+                return context
+            
+            context['product'] = product
+            return context
+        except FoodProduct.DoesNotExist:
+            messages.error(self.request, 'Analysis result not found.')
+            context['error'] = True
+            return context
+
+class UserFriendlyResultView(TemplateView):
+    """View for displaying user-friendly analysis results"""
+    template_name = 'detector/user_friendly_result.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        product_id = kwargs.get('product_id')
+        
+        try:
+            product = FoodProduct.objects.get(id=product_id)
+            if product.user and self.request.user != product.user and not self.request.user.is_staff:
+                messages.error(self.request, "You don't have permission to view this analysis")
+                context['error'] = True
+                return context
+            
+            context['product'] = product
+            return context
+        except FoodProduct.DoesNotExist:
+            messages.error(self.request, 'Analysis result not found.')
+            context['error'] = True
+            return context
+
+class AwarenessCampaignView(TemplateView):
+    """Public view for awareness campaigns and advertisements"""
+    template_name = 'detector/awareness.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get active advertisements
+        advertisements = Advertisement.objects.filter(is_active=True).order_by('-created_at')
+        
+        # Get approved gallery items
+        gallery_items = GalleryItem.objects.filter(status='approved').order_by('-created_at')
+        
+        # Featured items
+        featured_gallery = gallery_items.filter(is_featured=True)[:6]
+        
+        context.update({
+            'advertisements': advertisements,
+            'gallery_items': gallery_items,
+            'featured_gallery': featured_gallery,
+        })
+        return context
 
 class MediaLibraryView(TemplateView):
     """Public view for media library - shows approved media items"""
@@ -973,7 +1118,60 @@ class MediaLibraryView(TemplateView):
         })
         return context
 
-class AwarenessCampaignView(TemplateView):
+class AdminAnalysisReportView(AdminRequiredMixin, TemplateView):
+    """Dedicated admin analysis report view"""
+    template_name = 'detector/admin_analysis_report.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        product_id = kwargs.get('product_id')
+        
+        try:
+            product = FoodProduct.objects.get(id=product_id)
+            context['product'] = product
+            
+            # Generate copy-level estimation for fake products
+            if product.final_prediction != 'Real':
+                context['copy_analysis'] = self._generate_copy_analysis(product)
+            
+            return context
+        except FoodProduct.DoesNotExist:
+            messages.error(self.request, 'Analysis result not found.')
+            context['error'] = True
+            return context
+    
+    def _generate_copy_analysis(self, product):
+        """Generate copy-level estimation for fake products"""
+        return {
+            'barcode_copied': product.barcode_score < 50,
+            'text_copied': 'Partial' if product.ocr_score > 30 else 'Full' if product.ocr_score > 0 else 'None',
+            'logo_copied': 'Partial' if product.logo_score > 30 else 'None',
+            'overall_similarity': max(product.logo_score, product.packaging_score)
+        }
+
+class AnalysisResultView(TemplateView):
+    """View for displaying detailed analysis results"""
+    template_name = 'detector/analysis_result.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        product_id = kwargs.get('product_id')
+        
+        try:
+            product = FoodProduct.objects.get(id=product_id)
+            # Check if user has permission to view this analysis
+            if product.user and self.request.user != product.user and not self.request.user.is_staff:
+                messages.error(self.request, "You don't have permission to view this analysis")
+                context['error'] = True
+                return context
+            
+            context['product'] = product
+            return context
+        except FoodProduct.DoesNotExist:
+            messages.error(self.request, 'Analysis result not found.')
+            context['error'] = True
+            return context
+
     """Public view for awareness campaigns and advertisements"""
     template_name = 'detector/awareness.html'
 

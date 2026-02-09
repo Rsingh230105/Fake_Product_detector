@@ -81,6 +81,16 @@ class FoodProduct(models.Model):
     brand_match = models.BooleanField(default=False)  # Whether OCR found matching brand
     ocr_results = models.JSONField(default=dict, blank=True)  # Structured OCR results
     
+    # Component-wise scores for detailed analysis
+    barcode_score = models.FloatField(null=True, blank=True)
+    logo_score = models.FloatField(null=True, blank=True)
+    ocr_score = models.FloatField(null=True, blank=True)
+    packaging_score = models.FloatField(null=True, blank=True)
+    final_score = models.FloatField(null=True, blank=True)
+    failure_reasons = models.JSONField(default=list, blank=True)  # List of failure reasons
+    detailed_analysis = models.JSONField(default=dict, blank=True)  # Structured component analysis
+    user_report = models.JSONField(default=dict, blank=True)  # User-friendly report
+    
     # Additional analysis fields
     risk_level = models.CharField(
         max_length=10,
@@ -234,6 +244,23 @@ class UserActivity(models.Model):
     
     def __str__(self):
         return f"{self.user.email} - {self.get_activity_type_display()}"
+
+class UserFeedback(models.Model):
+    """Model for storing user feedback and issue reports"""
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='feedback')
+    product = models.ForeignKey(FoodProduct, on_delete=models.CASCADE, related_name='feedback')
+    reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved = models.BooleanField(default=False)
+    admin_response = models.TextField(blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_feedback')
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Feedback from {self.user.email} - {self.product.brand_name}"
 
 class PasswordResetToken(models.Model):
     """Model for password reset tokens"""

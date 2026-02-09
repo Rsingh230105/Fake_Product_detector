@@ -25,6 +25,13 @@ urlpatterns = [
     
     # API endpoints
     path('api/detect/', views.FoodDetectorView.as_view(), name='detect_food'),
+    path('api/report-issue/', views.ReportIssueView.as_view(), name='report_issue'),
+    
+    # Analysis results
+    path('analysis/<int:product_id>/', views.AnalysisResultView.as_view(), name='analysis_result'),
+    path('admin-report/<int:product_id>/', views.AdminAnalysisReportView.as_view(), name='admin_analysis_report'),
+    path('report/<int:product_id>/', views.UserFriendlyResultView.as_view(), name='user_friendly_result'),
+    path('result/<int:product_id>/', views.SimpleResultView.as_view(), name='simple_result'),
     
     # Custom Admin Interface (Staff only)
     path('media-admin/dashboard/', views.MediaAdminDashboard.as_view(), name='admin_dashboard'),

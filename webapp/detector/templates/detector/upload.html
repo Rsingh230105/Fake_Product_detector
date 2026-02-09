@@ -368,7 +368,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitBtn.classList.add('from-green-500', 'to-green-600');
                 
                 setTimeout(() => {
-                    window.location.href = '/dashboard/';
+                    // Check if admin redirect
+                    if (result.redirect === 'admin') {
+                        window.location.href = result.admin_url;
+                    } else {
+                        window.location.href = `/result/${result.id}/`;
+                    }
                 }, 1500);
             } else {
                 throw new Error(result.error || 'Upload failed');

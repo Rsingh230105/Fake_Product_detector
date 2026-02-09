@@ -1,0 +1,212 @@
+{% extends "detector/base.html" %}
+{% load static %}
+
+{% block title %}Analysis Report - {{ product.brand_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-icon { font-size: 1.5rem; }
+    .check-card { transition: transform 0.2s ease; }
+    .check-card:hover { transform: translateY(-2px); }
+    .fade-in { animation: fadeIn 0.6s ease-in; }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- Product Summary -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Product Analysis Report</h1>
+                <div class="text-lg text-gray-600">{{ product.user_report.product_summary.product_name }}</div>
+                <div class="text-sm text-gray-500 mt-2">
+                    Analyzed on {{ product.user_report.product_summary.analysis_date }}
+                    <br>{{ product.user_report.product_summary.images_analyzed }} images processed
+                </div>
+            </div>
+        </div>
+
+        <!-- Final Result -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <div class="text-center">
+                <div class="mb-6">
+                    {% if product.user_report.final_result.status == 'Real' %}
+                        <div class="inline-block p-4 bg-green-100 rounded-full mb-4">
+                            <i class="fas fa-shield-check text-5xl text-green-600"></i>
+                        </div>
+                        <div class="text-3xl font-bold text-green-800 mb-2">AUTHENTIC PRODUCT</div>
+                    {% elif product.user_report.final_result.status == 'Fake' %}
+                        <div class="inline-block p-4 bg-red-100 rounded-full mb-4">
+                            <i class="fas fa-shield-times text-5xl text-red-600"></i>
+                        </div>
+                        <div class="text-3xl font-bold text-red-800 mb-2">COUNTERFEIT DETECTED</div>
+                    {% else %}
+                        <div class="inline-block p-4 bg-yellow-100 rounded-full mb-4">
+                            <i class="fas fa-shield-exclamation text-5xl text-yellow-600"></i>
+                        </div>
+                        <div class="text-3xl font-bold text-yellow-800 mb-2">SUSPICIOUS PRODUCT</div>
+                    {% endif %}
+                </div>
+                
+                <div class="text-lg text-gray-700 mb-4 max-w-2xl mx-auto">
+                    {{ product.user_report.final_result.conclusion }}
+                </div>
+                
+                <div class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold
+                    {% if product.user_report.final_result.confidence_level == 'High Confidence' %}bg-blue-100 text-blue-800
+                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ product.user_report.final_result.confidence_level }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Safety & Authenticity Checks -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">
+                <i class="fas fa-clipboard-check mr-3 text-blue-600"></i>
+                Safety & Authenticity Checks
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {% for check in product.user_report.safety_checks %}
+                <div class="check-card bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border border-gray-200">
+                    <div class="flex items-start justify-between mb-4">
+                        <h3 class="font-bold text-gray-900">{{ check.check_name }}</h3>
+                        <div class="flex items-center">
+                            <span class="status-icon mr-2">{{ check.status }}</span>
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                {% if check.importance == 'Critical' %}bg-red-100 text-red-700
+                                {% elif check.importance == 'Important' %}bg-orange-100 text-orange-700
+                                {% else %}bg-blue-100 text-blue-700{% endif %}">
+                                {{ check.importance }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-700 text-sm">{{ check.message }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Fake Reasons (if applicable) -->
+        {% if product.user_report.fake_reasons %}
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in border-l-4 border-red-500">
+            <h2 class="text-2xl font-bold text-red-800 mb-6 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-3"></i>
+                {{ product.user_report.fake_reasons.title }}
+            </h2>
+            
+            <div class="space-y-3 mb-6">
+                {% for reason in product.user_report.fake_reasons.reasons %}
+                <div class="flex items-start p-3 bg-red-50 border-l-4 border-red-400 rounded-lg">
+                    <i class="fas fa-times-circle text-red-500 mt-1 mr-3"></i>
+                    <span class="text-red-800">{{ reason }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="bg-red-100 p-4 rounded-lg">
+                <p class="text-red-800 font-medium mb-2">{{ product.user_report.fake_reasons.explanation }}</p>
+                <p class="text-red-700 text-sm">{{ product.user_report.fake_reasons.advice }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recommendation -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Our Recommendation</h2>
+            
+            <div class="text-center">
+                <div class="inline-block px-8 py-4 rounded-xl text-2xl font-bold mb-4
+                    {% if product.user_report.recommendation.color == 'green' %}bg-green-100 text-green-800
+                    {% elif product.user_report.recommendation.color == 'red' %}bg-red-100 text-red-800
+                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ product.user_report.recommendation.action }}
+                </div>
+                
+                <p class="text-lg text-gray-700 max-w-2xl mx-auto">
+                    {{ product.user_report.recommendation.message }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Technical Details (Collapsible) -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <div class="text-center">
+                <button onclick="toggleTechnicalDetails()" class="text-blue-600 hover:text-blue-800 font-medium">
+                    <i class="fas fa-cog mr-2"></i>
+                    View Technical Details
+                    <i id="techArrow" class="fas fa-chevron-down ml-2"></i>
+                </button>
+            </div>
+            
+            <div id="technicalDetails" class="hidden mt-6 pt-6 border-t border-gray-200">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="text-center p-4 bg-blue-100 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-800">{{ product.barcode_score|default:0|floatformat:0 }}%</div>
+                        <div class="text-sm text-blue-600">Barcode Score</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-100 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-800">{{ product.logo_score|default:0|floatformat:0 }}%</div>
+                        <div class="text-sm text-purple-600">Logo Score</div>
+                    </div>
+                    <div class="text-center p-4 bg-green-100 rounded-lg">
+                        <div class="text-2xl font-bold text-green-800">{{ product.ocr_score|default:0|floatformat:0 }}%</div>
+                        <div class="text-sm text-green-600">OCR Score</div>
+                    </div>
+                    <div class="text-center p-4 bg-pink-100 rounded-lg">
+                        <div class="text-2xl font-bold text-pink-800">{{ product.packaging_score|default:0|floatformat:0 }}%</div>
+                        <div class="text-sm text-pink-600">Packaging Score</div>
+                    </div>
+                </div>
+                
+                <div class="text-center text-sm text-gray-600">
+                    <p>Final Score: {{ product.final_score|floatformat:1 }}%</p>
+                    <p>Processing Time: {{ product.processing_time|floatformat:2 }}s</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="text-center space-x-4 fade-in">
+            <a href="{% url 'detector:upload' %}" 
+               class="inline-flex items-center px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">
+                <i class="fas fa-plus mr-2"></i>
+                Analyze Another Product
+            </a>
+            
+            {% if user.is_authenticated %}
+            <a href="{% url 'detector:analyses' %}" 
+               class="inline-flex items-center px-8 py-4 bg-gray-600 text-white font-bold rounded-xl hover:bg-gray-700 transition">
+                <i class="fas fa-history mr-2"></i>
+                View All Analyses
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTechnicalDetails() {
+    const details = document.getElementById('technicalDetails');
+    const arrow = document.getElementById('techArrow');
+    
+    if (details.classList.contains('hidden')) {
+        details.classList.remove('hidden');
+        arrow.classList.remove('fa-chevron-down');
+        arrow.classList.add('fa-chevron-up');
+    } else {
+        details.classList.add('hidden');
+        arrow.classList.remove('fa-chevron-up');
+        arrow.classList.add('fa-chevron-down');
+    }
+}
+</script>
+{% endblock %}

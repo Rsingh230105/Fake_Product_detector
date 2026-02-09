@@ -1,0 +1,441 @@
+{% extends "detector/base.html" %}
+{% load static %}
+
+{% block title %}Analysis Result - {{ product.brand_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-badge {
+        transition: all 0.3s ease;
+    }
+    .component-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .component-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .progress-bar {
+        transition: width 0.8s ease-in-out;
+    }
+    .fade-in {
+        animation: fadeIn 0.6s ease-in;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-red-50 via-red-50 to-red-100">
+    <div class="max-w-2xl mx-auto text-center">
+        <div class="bg-white rounded-3xl shadow-2xl p-8">
+            <i class="fas fa-exclamation-triangle text-6xl text-red-600 mb-4"></i>
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">Access Error</h1>
+            <p class="text-gray-600 mb-6">Unable to access the analysis result.</p>
+            <a href="{% url 'detector:upload' %}" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Upload
+            </a>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div class="max-w-6xl mx-auto">
+        
+        <!-- Header Section -->
+        <div class="text-center mb-8 fade-in">
+            <div class="inline-block p-4 bg-white rounded-full shadow-lg mb-4">
+                {% if product.final_prediction == 'Real' %}
+                    <i class="fas fa-shield-check text-5xl text-green-600"></i>
+                {% elif product.final_prediction == 'Fake' %}
+                    <i class="fas fa-shield-times text-5xl text-red-600"></i>
+                {% else %}
+                    <i class="fas fa-shield-exclamation text-5xl text-yellow-600"></i>
+                {% endif %}
+            </div>
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Analysis Complete</h1>
+            <p class="text-xl text-gray-600">{{ product.brand_name }}</p>
+        </div>
+
+        <!-- Overall Result Card -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Overall Result</h2>
+                
+                <!-- Status Badge -->
+                <div class="mb-6">
+                    {% if product.final_prediction == 'Real' %}
+                        <span class="inline-flex items-center px-8 py-4 rounded-full text-2xl font-bold bg-green-100 text-green-800 status-badge">
+                            <i class="fas fa-check-circle mr-3"></i>
+                            AUTHENTIC PRODUCT
+                        </span>
+                    {% elif product.final_prediction == 'Fake' %}
+                        <span class="inline-flex items-center px-8 py-4 rounded-full text-2xl font-bold bg-red-100 text-red-800 status-badge">
+                            <i class="fas fa-times-circle mr-3"></i>
+                            COUNTERFEIT DETECTED
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center px-8 py-4 rounded-full text-2xl font-bold bg-yellow-100 text-yellow-800 status-badge">
+                            <i class="fas fa-exclamation-triangle mr-3"></i>
+                            SUSPICIOUS PRODUCT
+                        </span>
+                    {% endif %}
+                </div>
+
+                <!-- Confidence Score -->
+                <div class="mb-6">
+                    <div class="text-6xl font-bold mb-2 
+                        {% if product.final_score >= 70 %}text-green-600
+                        {% elif product.final_score >= 40 %}text-yellow-600
+                        {% else %}text-red-600{% endif %}">
+                        {{ product.final_score|floatformat:0 }}%
+                    </div>
+                    <p class="text-gray-600">Overall Confidence Score</p>
+                </div>
+
+                <!-- Risk Level -->
+                <div class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold
+                    {% if product.risk_level == 'low' %}bg-green-100 text-green-800
+                    {% elif product.risk_level == 'medium' %}bg-yellow-100 text-yellow-800
+                    {% else %}bg-red-100 text-red-800{% endif %}">
+                    Risk Level: {{ product.get_risk_level_display }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Component-wise Analysis -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-microscope mr-3 text-blue-600"></i>
+                Component-wise Verification
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- Barcode Verification -->
+                <div class="component-card bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-900">Barcode Verification</h3>
+                        {% if product.detailed_analysis.barcode.status == 'verified' %}
+                            <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        {% elif product.detailed_analysis.barcode.status == 'copied' %}
+                            <i class="fas fa-times-circle text-2xl text-red-600"></i>
+                        {% else %}
+                            <i class="fas fa-question-circle text-2xl text-gray-400"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Detected:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.barcode.detected %}Yes{% else %}No{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.barcode.detected %}
+                        <div class="flex justify-between">
+                            <span>Database Match:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.barcode.matches_database %}Yes{% else %}No{% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
+                        <div class="flex justify-between">
+                            <span>Confidence:</span>
+                            <span class="font-semibold">{{ product.barcode_score|floatformat:0 }}%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="mt-4">
+                        <div class="bg-gray-200 rounded-full h-2">
+                            <div class="progress-bar h-2 rounded-full 
+                                {% if product.barcode_score >= 70 %}bg-green-500
+                                {% elif product.barcode_score >= 40 %}bg-yellow-500
+                                {% else %}bg-red-500{% endif %}" 
+                                style="width: {{ product.barcode_score }}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FSSAI License -->
+                <div class="component-card bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-900">FSSAI License</h3>
+                        {% if product.detailed_analysis.fssai.extracted and product.detailed_analysis.fssai.valid_format %}
+                            <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle text-2xl text-red-600"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Extracted:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.fssai.extracted %}Yes{% else %}No{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.fssai.extracted %}
+                        <div class="flex justify-between">
+                            <span>Valid Format:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.fssai.valid_format %}Yes{% else %}No{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.fssai.number %}
+                        <div class="text-xs text-gray-600 mt-2">
+                            Number: {{ product.detailed_analysis.fssai.number }}
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Expiry Date -->
+                <div class="component-card bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-900">Expiry Date</h3>
+                        {% if product.detailed_analysis.expiry_date.detected and not product.detailed_analysis.expiry_date.is_expired %}
+                            <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        {% elif product.detailed_analysis.expiry_date.is_expired %}
+                            <i class="fas fa-exclamation-triangle text-2xl text-red-600"></i>
+                        {% else %}
+                            <i class="fas fa-question-circle text-2xl text-gray-400"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Detected:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.expiry_date.detected %}Yes{% else %}No{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.expiry_date.detected %}
+                        <div class="flex justify-between">
+                            <span>Status:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.expiry_date.is_expired %}Expired{% else %}Valid{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.expiry_date.date_value %}
+                        <div class="text-xs text-gray-600 mt-2">
+                            Date: {{ product.detailed_analysis.expiry_date.date_value }}
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Logo Verification -->
+                <div class="component-card bg-gradient-to-br from-indigo-50 to-indigo-100 p-6 rounded-xl border border-indigo-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-900">Logo Verification</h3>
+                        {% if product.detailed_analysis.logo.status == 'match' %}
+                            <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        {% elif product.detailed_analysis.logo.status == 'partial_match' %}
+                            <i class="fas fa-exclamation-circle text-2xl text-yellow-600"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle text-2xl text-red-600"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Detected:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.logo.detected %}Yes{% else %}No{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.logo.detected %}
+                        <div class="flex justify-between">
+                            <span>Similarity:</span>
+                            <span class="font-semibold">{{ product.detailed_analysis.logo.similarity_score }}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Status:</span>
+                            <span class="font-semibold capitalize">{{ product.detailed_analysis.logo.status|replace:"_":" " }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="mt-4">
+                        <div class="bg-gray-200 rounded-full h-2">
+                            <div class="progress-bar h-2 rounded-full 
+                                {% if product.logo_score >= 70 %}bg-green-500
+                                {% elif product.logo_score >= 40 %}bg-yellow-500
+                                {% else %}bg-red-500{% endif %}" 
+                                style="width: {{ product.logo_score }}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Number -->
+                <div class="component-card bg-gradient-to-br from-yellow-50 to-yellow-100 p-6 rounded-xl border border-yellow-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-900">Batch Number</h3>
+                        {% if product.detailed_analysis.batch_number.detected %}
+                            <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle text-2xl text-red-600"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Detected:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.batch_number.detected %}Yes{% else %}No{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.batch_number.detected %}
+                        <div class="flex justify-between">
+                            <span>Location:</span>
+                            <span class="font-semibold">
+                                {% if product.detailed_analysis.batch_number.present_expected_location %}Expected{% else %}Unexpected{% endif %}
+                            </span>
+                        </div>
+                        {% if product.detailed_analysis.batch_number.value %}
+                        <div class="text-xs text-gray-600 mt-2">
+                            Value: {{ product.detailed_analysis.batch_number.value }}
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Packaging Analysis -->
+                <div class="component-card bg-gradient-to-br from-pink-50 to-pink-100 p-6 rounded-xl border border-pink-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-900">Packaging</h3>
+                        {% if product.detailed_analysis.packaging.status == 'match' %}
+                            <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        {% elif product.detailed_analysis.packaging.status == 'partial' %}
+                            <i class="fas fa-exclamation-circle text-2xl text-yellow-600"></i>
+                        {% else %}
+                            <i class="fas fa-times-circle text-2xl text-red-600"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Color Match:</span>
+                            <span class="font-semibold">{{ product.detailed_analysis.packaging.color_similarity }}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Texture Match:</span>
+                            <span class="font-semibold">{{ product.detailed_analysis.packaging.texture_similarity }}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Status:</span>
+                            <span class="font-semibold capitalize">{{ product.detailed_analysis.packaging.status }}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="mt-4">
+                        <div class="bg-gray-200 rounded-full h-2">
+                            <div class="progress-bar h-2 rounded-full 
+                                {% if product.packaging_score >= 70 %}bg-green-500
+                                {% elif product.packaging_score >= 40 %}bg-yellow-500
+                                {% else %}bg-red-500{% endif %}" 
+                                style="width: {{ product.packaging_score }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failure Reasons (if any) -->
+        {% if product.failure_reasons %}
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-3 text-red-600"></i>
+                Issues Detected
+            </h2>
+            
+            <div class="space-y-3">
+                {% for reason in product.failure_reasons %}
+                <div class="flex items-start p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
+                    <i class="fas fa-times-circle text-red-500 mt-1 mr-3"></i>
+                    <span class="text-red-800">{{ reason }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Decision Logic -->
+        <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 fade-in">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-calculator mr-3 text-blue-600"></i>
+                How We Calculated This Result
+            </h2>
+            
+            <div class="bg-blue-50 p-6 rounded-xl mb-6">
+                <p class="text-gray-800 font-medium">
+                    {{ product.detailed_analysis.explanation.decision_logic|default:"Barcode (30%) + Logo (25%) + OCR Text (25%) + Packaging (20%)" }}
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center p-4 bg-blue-100 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-800">{{ product.barcode_score|floatformat:0 }}%</div>
+                    <div class="text-sm text-blue-600">Barcode (30%)</div>
+                </div>
+                <div class="text-center p-4 bg-purple-100 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-800">{{ product.logo_score|floatformat:0 }}%</div>
+                    <div class="text-sm text-purple-600">Logo (25%)</div>
+                </div>
+                <div class="text-center p-4 bg-green-100 rounded-lg">
+                    <div class="text-2xl font-bold text-green-800">{{ product.ocr_score|floatformat:0 }}%</div>
+                    <div class="text-sm text-green-600">OCR Text (25%)</div>
+                </div>
+                <div class="text-center p-4 bg-pink-100 rounded-lg">
+                    <div class="text-2xl font-bold text-pink-800">{{ product.packaging_score|floatformat:0 }}%</div>
+                    <div class="text-sm text-pink-600">Packaging (20%)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="text-center space-x-4 fade-in">
+            <a href="{% url 'detector:upload' %}" 
+               class="inline-flex items-center px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">
+                <i class="fas fa-plus mr-2"></i>
+                Analyze Another Product
+            </a>
+            
+            {% if user.is_authenticated %}
+            <a href="{% url 'detector:analyses' %}" 
+               class="inline-flex items-center px-8 py-4 bg-gray-600 text-white font-bold rounded-xl hover:bg-gray-700 transition">
+                <i class="fas fa-history mr-2"></i>
+                View Analysis History
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Animate progress bars on load
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBars = document.querySelectorAll('.progress-bar');
+    progressBars.forEach(bar => {
+        const width = bar.style.width;
+        bar.style.width = '0%';
+        setTimeout(() => {
+            bar.style.width = width;
+        }, 500);
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

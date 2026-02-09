@@ -1,0 +1,307 @@
+{% extends "detector/base.html" %}
+{% load static %}
+
+{% block title %}Admin Analysis Report - {{ product.brand_name }}{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-red-50 via-red-50 to-red-100">
+    <div class="max-w-2xl mx-auto text-center">
+        <div class="bg-white rounded-3xl shadow-2xl p-8">
+            <i class="fas fa-exclamation-triangle text-6xl text-red-600 mb-4"></i>
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">Access Error</h1>
+            <p class="text-gray-600 mb-6">Unable to access the analysis result.</p>
+            <a href="{% url 'detector:analyses' %}" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Analyses
+            </a>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+    <div class="max-w-5xl mx-auto">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-block p-4 bg-white rounded-full shadow-lg mb-4">
+                <i class="fas fa-shield-alt text-4xl text-blue-600"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Admin Product Analysis Report</h1>
+            <p class="text-lg text-gray-600">Detailed Investigation Results</p>
+        </div>
+
+        <!-- A. Product Overview -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-info-circle mr-3 text-blue-600"></i>
+                Product Overview
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Product Name</label>
+                        <p class="text-lg font-semibold text-gray-900">{{ product.brand_name }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Date of Analysis</label>
+                        <p class="text-lg text-gray-900">{{ product.created_at|date:"F d, Y H:i" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Images Analyzed</label>
+                        <p class="text-lg text-gray-900">{{ product.images.count }} image{{ product.images.count|pluralize }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="text-6xl font-bold mb-2 
+                            {% if product.final_prediction == 'Real' %}text-green-600
+                            {% else %}text-red-600{% endif %}">
+                            {{ product.final_score|floatformat:0 }}%
+                        </div>
+                        <div class="text-lg font-semibold mb-4">Final Internal Decision</div>
+                        {% if product.final_prediction == 'Real' %}
+                            <span class="inline-flex items-center px-6 py-3 rounded-full text-xl font-bold bg-green-100 text-green-800">
+                                <i class="fas fa-check-circle mr-2"></i>REAL
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-6 py-3 rounded-full text-xl font-bold bg-red-100 text-red-800">
+                                <i class="fas fa-times-circle mr-2"></i>FAKE
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- B. Detailed Verification Breakdown -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-microscope mr-3 text-purple-600"></i>
+                Detailed Verification Breakdown
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- 1. Barcode Analysis -->
+                <div class="border border-blue-200 rounded-xl p-6 bg-blue-50">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-barcode mr-2 text-blue-600"></i>
+                        1. Barcode Analysis
+                    </h3>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="font-medium">Detection Status:</span>
+                            <span class="font-bold">
+                                {% if product.detailed_analysis.barcode.detected %}Detected{% else %}Not Detected{% endif %}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Match Percentage:</span>
+                            <span class="font-bold text-2xl {% if product.barcode_score >= 70 %}text-green-600{% elif product.barcode_score >= 40 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ product.barcode_score|floatformat:0 }}%
+                            </span>
+                        </div>
+                        {% if product.final_prediction != 'Real' and product.barcode_score < 50 %}
+                        <div class="bg-red-100 border border-red-300 rounded-lg p-3 mt-3">
+                            <p class="text-red-800 font-medium">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                Barcode copied or reused from another product
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 2. Logo Analysis -->
+                <div class="border border-purple-200 rounded-xl p-6 bg-purple-50">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-image mr-2 text-purple-600"></i>
+                        2. Logo Analysis
+                    </h3>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="font-medium">Match Percentage:</span>
+                            <span class="font-bold text-2xl {% if product.logo_score >= 70 %}text-green-600{% elif product.logo_score >= 40 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ product.logo_score|floatformat:0 }}%
+                            </span>
+                        </div>
+                        <div class="bg-gray-100 border border-gray-300 rounded-lg p-3">
+                            <p class="text-gray-800 font-medium">
+                                {% if product.logo_score >= 70 %}
+                                    Logo matches official brand standards
+                                {% elif product.logo_score >= 40 %}
+                                    Logo partially matches official brand
+                                {% else %}
+                                    Logo shape/color alignment mismatch detected
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. OCR & Text Verification -->
+                <div class="border border-green-200 rounded-xl p-6 bg-green-50">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-font mr-2 text-green-600"></i>
+                        3. OCR & Text Verification
+                    </h3>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="font-medium">FSSAI Number:</span>
+                            <span class="font-bold">
+                                {% if product.detailed_analysis.fssai.extracted %}
+                                    {% if product.detailed_analysis.fssai.valid_format %}Valid{% else %}Invalid{% endif %}
+                                {% else %}Missing{% endif %}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Expiry Date:</span>
+                            <span class="font-bold">
+                                {% if product.detailed_analysis.expiry_date.detected %}
+                                    {% if product.detailed_analysis.expiry_date.is_expired %}Expired{% else %}Valid{% endif %}
+                                {% else %}Missing{% endif %}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Batch Number:</span>
+                            <span class="font-bold">
+                                {% if product.detailed_analysis.batch_number.detected %}Detected{% else %}Missing{% endif %}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">OCR Score:</span>
+                            <span class="font-bold text-xl {% if product.ocr_score >= 70 %}text-green-600{% elif product.ocr_score >= 40 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ product.ocr_score|floatformat:0 }}%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Packaging Analysis -->
+                <div class="border border-orange-200 rounded-xl p-6 bg-orange-50">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-box mr-2 text-orange-600"></i>
+                        4. Packaging Analysis
+                    </h3>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="font-medium">Similarity Percentage:</span>
+                            <span class="font-bold text-2xl {% if product.packaging_score >= 70 %}text-green-600{% elif product.packaging_score >= 40 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ product.packaging_score|floatformat:0 }}%
+                            </span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span>Color Match:</span>
+                                <span class="font-medium">{{ product.detailed_analysis.packaging.color_similarity|default:0 }}%</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Layout Consistency:</span>
+                                <span class="font-medium">{{ product.detailed_analysis.packaging.texture_similarity|default:0 }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- C. Final Decision Explanation -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-gavel mr-3 text-red-600"></i>
+                Final Decision Explanation
+            </h2>
+            
+            <div class="{% if product.final_prediction == 'Real' %}bg-green-50 border border-green-200{% else %}bg-red-50 border border-red-200{% endif %} rounded-xl p-6">
+                {% if product.final_prediction == 'Real' %}
+                    <div class="flex items-start">
+                        <i class="fas fa-check-circle text-3xl text-green-600 mr-4 mt-1"></i>
+                        <div>
+                            <h3 class="text-xl font-bold text-green-800 mb-3">AUTHENTIC PRODUCT VERIFIED</h3>
+                            <p class="text-green-800 text-lg leading-relaxed">
+                                The product passed barcode, logo, and safety text verification. 
+                                All critical authentication checks were successful, indicating this is a genuine product 
+                                that meets official brand standards and safety requirements.
+                            </p>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="flex items-start">
+                        <i class="fas fa-times-circle text-3xl text-red-600 mr-4 mt-1"></i>
+                        <div>
+                            <h3 class="text-xl font-bold text-red-800 mb-3">COUNTERFEIT PRODUCT DETECTED</h3>
+                            <p class="text-red-800 text-lg leading-relaxed">
+                                The product failed critical safety checks. Although packaging may look similar, 
+                                barcode and FSSAI details do not match official records. This indicates a counterfeit 
+                                product that poses potential safety risks to consumers.
+                            </p>
+                            {% if product.failure_reasons %}
+                            <div class="mt-4">
+                                <h4 class="font-bold text-red-800 mb-2">Specific Issues Detected:</h4>
+                                <ul class="list-disc list-inside space-y-1">
+                                    {% for reason in product.failure_reasons %}
+                                    <li class="text-red-700">{{ reason }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- D. Copy-Level Estimation (Fake Analysis) -->
+        {% if product.final_prediction != 'Real' and copy_analysis %}
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-copy mr-3 text-yellow-600"></i>
+                Copy-Level Estimation
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                        <span class="font-medium">Barcode Copied:</span>
+                        <span class="font-bold {% if copy_analysis.barcode_copied %}text-red-600{% else %}text-green-600{% endif %}">
+                            {% if copy_analysis.barcode_copied %}Yes{% else %}No{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                        <span class="font-medium">Text Copied:</span>
+                        <span class="font-bold text-yellow-600">{{ copy_analysis.text_copied }}</span>
+                    </div>
+                    <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                        <span class="font-medium">Logo Copied:</span>
+                        <span class="font-bold text-yellow-600">{{ copy_analysis.logo_copied }}</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="text-4xl font-bold text-red-600 mb-2">{{ copy_analysis.overall_similarity|floatformat:0 }}%</div>
+                        <div class="text-lg font-semibold text-gray-700">Overall Similarity</div>
+                        <div class="text-sm text-gray-500 mt-2">with Genuine Product</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="text-center space-x-4">
+            <a href="{% url 'detector:analyses' %}" 
+               class="inline-flex items-center px-8 py-4 bg-gray-600 text-white font-bold rounded-xl hover:bg-gray-700 transition">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Analyses
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
