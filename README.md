@@ -1,244 +1,223 @@
-# Fake Food Detection System 🛡️
+# Food Product Authenticity Detection System
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![Django](https://img.shields.io/badge/Django-5.2.3-green.svg)](https://www.djangoproject.com/)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.20.0-orange.svg)](https://www.tensorflow.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+AI-powered web application for detecting counterfeit food products using deep learning, OCR, and barcode verification.
 
-An AI-powered web application that detects counterfeit FMCG (Fast-Moving Consumer Goods) products using computer vision, OCR technology, and machine learning algorithms.
+## Overview
 
-## 📋 Table of Contents
-- [Problem Statement](#-problem-statement)
-- [Proposed Solution](#-proposed-solution)
-- [Key Features](#-key-features)
-- [Technology Stack](#-technology-stack)
-- [Project Architecture](#-project-architecture)
-- [How It Works](#-how-it-works)
-- [Installation & Setup](#-installation--setup)
-- [Future Scope](#-future-scope)
-- [Disclaimer](#-disclaimer)
+This system analyzes food product images to determine authenticity by examining multiple components:
+- **Barcode verification** against official databases
+- **Logo detection** and similarity matching
+- **OCR text extraction** for FSSAI license, expiry dates, and batch numbers
+- **Packaging analysis** for color and texture matching
+- **ML classification** using MobileNetV2 architecture
 
-## 🚨 Problem Statement
-
-Counterfeit products pose a significant threat to consumer safety, brand reputation, and economic stability. According to industry reports, counterfeit goods account for approximately 3.3% of world trade, costing legitimate businesses over $500 billion annually. In the FMCG sector, fake products can contain harmful substances, incorrect dosages, or poor quality ingredients that endanger public health.
-
-**Key Challenges:**
-- Difficulty in distinguishing genuine from counterfeit products
-- Lack of accessible verification tools for consumers
-- Time-consuming manual inspection processes
-- Limited technological solutions for small retailers
-
-## 💡 Proposed Solution
-
-The Fake Food Detection System leverages cutting-edge AI technologies to provide an accessible, user-friendly platform for product authenticity verification. By combining computer vision, optical character recognition (OCR), and machine learning, the system analyzes multiple aspects of product packaging to determine authenticity.
-
-## ✨ Key Features
-
-- **🔍 Multi-View Analysis**: Supports front, back, side, and barcode image analysis
-- **📝 OCR Text Extraction**: Automatically extracts and analyzes text from product packaging
-- **🤖 AI-Powered Classification**: Machine learning model trained to distinguish genuine from counterfeit products
-- **🔍 Brand Verification**: Cross-references extracted text with known brand databases
-- **👤 User Authentication**: Secure user registration and login system
-- **📱 Responsive Web Interface**: Works seamlessly across desktop and mobile devices
-- **🖼️ Gallery System**: Users can view and manage their analysis history
-- **📊 Admin Dashboard**: Comprehensive admin panel for system management
-- **🔒 Secure Architecture**: Implements industry-standard security practices
-
-## 🛠️ Technology Stack
-
-### Backend
-- **Framework**: Django 5.2.3
-- **API**: Django REST Framework 3.14.0
-- **Authentication**: Django Allauth 0.63.3
-- **Database**: SQLite (development) / PostgreSQL (production)
-
-### Frontend
-- **Templates**: Django Templates with Bootstrap
-- **Styling**: Custom CSS with responsive design
-- **JavaScript**: Vanilla JavaScript with jQuery
-
-### AI/ML Components
-- **Deep Learning**: TensorFlow 2.20.0
-- **Computer Vision**: OpenCV 4.12.0
-- **OCR Engine**: Tesseract 0.3.13
-- **Text Matching**: FuzzyWuzzy 0.18.0
-- **Model Architecture**: MobileNetV2 (fine-tuned for product classification)
-
-### Additional Libraries
-- **Image Processing**: Pillow 11.3.0
-- **Phone Numbers**: django-phonenumber-field 7.3.0
-- **Environment Management**: python-dotenv 1.0.0
-- **Static Files**: WhiteNoise 6.9.0
-
-## 🏗️ Project Architecture
+## System Architecture
 
 ```
-Fake Food Detection System/
-├── webapp/                          # Django Project Root
-│   ├── food_detection/              # Main Django Project Settings
-│   ├── detector/                    # Core Application
-│   │   ├── models.py               # Database Models
-│   │   ├── views.py                # View Controllers
-│   │   ├── templates/              # HTML Templates
-│   │   ├── static/                 # CSS, JS, Images
+┌─────────────────┐
+│  Image Upload   │
+└────────┬────────┘
+         │
+    ┌────▼────┐
+    │ Django  │
+    │  API    │
+    └────┬────┘
+         │
+    ┌────▼──────────────────────┐
+    │  Multi-Component Analysis │
+    ├───────────────────────────┤
+    │ • MobileNetV2 CNN Model   │
+    │ • Tesseract OCR Engine    │
+    │ • OpenCV Image Processing │
+    │ • Barcode Detection       │
+    └────┬──────────────────────┘
+         │
+    ┌────▼────────┐
+    │ Final Score │
+    │ REAL / FAKE │
+    └─────────────┘
+```
+
+## Tech Stack
+
+**Backend:**
+- Django 4.2.0
+- Django REST Framework 3.14.0
+- TensorFlow 2.20+
+- Python 3.13
+
+**ML/CV:**
+- TensorFlow/Keras (MobileNetV2)
+- OpenCV 4.13+
+- Tesseract OCR
+- NumPy 2.0+
+- Pillow 12.0+
+
+**Security:**
+- python-magic (file validation)
+- Django authentication system
+- CSRF protection
+
+## Setup Instructions
+
+### 1. Clone Repository
+```bash
+git clone <repository-url>
+cd Project_Major_food
+```
+
+### 2. Create Virtual Environment
+```bash
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # Linux/Mac
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Install Tesseract OCR
+**Windows:**
+```bash
+# Download from: https://github.com/UB-Mannheim/tesseract/wiki
+# Install to: C:\Program Files\Tesseract-OCR\
+```
+
+**Linux:**
+```bash
+sudo apt-get install tesseract-ocr
+```
+
+### 5. Configure Environment
+```bash
+# Create .env file
+cp .env.example .env
+
+# Edit .env with your settings:
+SECRET_KEY=your-secret-key
+DEBUG=False
+ALLOWED_HOSTS=localhost,127.0.0.1
+```
+
+### 6. Run Migrations
+```bash
+cd webapp
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### 7. Create Superuser
+```bash
+python manage.py createsuperuser
+```
+
+### 8. Train Model (Optional)
+```bash
+# Place your dataset in: data/train/ and data/test/
+cd model_pipeline
+python train_model.py
+# Model saved to: models/mobilenet_v2_food_production.keras
+```
+
+### 9. Run Development Server
+```bash
+cd webapp
+python manage.py runserver
+```
+
+Access at: `http://localhost:8000`
+
+## Project Structure
+
+```
+Project_Major_food/
+├── webapp/
+│   ├── detector/           # Main Django app
+│   │   ├── models.py       # Database models
+│   │   ├── views.py        # API endpoints
+│   │   ├── validators.py   # File upload security
 │   │   └── utils/
-│   │       └── ml_utils.py         # ML Prediction Logic
-│   ├── media/                      # User Uploads (excluded)
-│   └── staticfiles/                # Collected Static Files (excluded)
-├── src/                            # ML Training Code
-│   ├── model_training/             # Training Scripts
-│   └── data_preprocessing/         # Data Processing Utilities
-├── models/                         # ML Model Files (excluded)
-├── data/                           # Training Data (excluded)
-├── requirements.txt                # Python Dependencies
-├── manage.py                       # Django Management Script
-└── README.md                       # Project Documentation
+│   │       ├── ml_utils.py # ML inference
+│   │       └── report_generator.py
+│   ├── templates/          # HTML templates
+│   └── static/             # CSS/JS assets
+├── models/                 # Trained ML models (not in repo)
+├── data/                   # Training datasets (not in repo)
+└── requirements.txt
 ```
 
-## 🔄 How It Works
+## Security Features
 
-### Detection Flow
-1. **📤 Image Upload**: User uploads multiple images of the product (front, back, side, barcode)
-2. **🔍 Preprocessing**: Images are resized, enhanced, and prepared for analysis
-3. **📝 OCR Analysis**: Tesseract extracts text from packaging labels and barcodes
-4. **🤖 ML Classification**: MobileNetV2 model analyzes visual features to predict authenticity
-5. **🔍 Brand Verification**: Extracted text is compared against known brand databases
-6. **📊 Result Generation**: System combines all analyses to provide confidence score
-7. **💾 Result Storage**: Analysis results are saved to user profile for future reference
+✅ **File Upload Validation:**
+- Magic byte verification
+- 5MB size limit
+- MIME type whitelist (jpeg, png, webp)
+- Decompression bomb protection
+- Image resolution limits
 
-### AI Model Details
-- **Architecture**: MobileNetV2 with custom classification head
-- **Input**: 224x224 RGB images
-- **Output**: Binary classification (FAKE/REAL) with confidence score
-- **Training Data**: Balanced dataset of genuine and counterfeit product images
-- **Accuracy**: >85% on validation set (varies by product category)
+✅ **Authentication:**
+- User registration/login system
+- Password reset functionality
+- Session management
+- CSRF protection
 
-## 🚀 Installation & Setup
+✅ **Data Protection:**
+- Environment variable configuration
+- Secure credential storage
+- SQL injection prevention (Django ORM)
 
-### Prerequisites
-- Python 3.8 or higher
-- pip package manager
-- Git
+## Model Training Notes
 
-### Local Development Setup
+**Dataset Requirements:**
+- Minimum 1000 images per class (Real/Fake)
+- Multiple views: front, back, side, barcode
+- High resolution (min 224x224)
+- Balanced class distribution
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/your-username/fake-food-detection.git
-   cd fake-food-detection
-   ```
+**Training Configuration:**
+- Architecture: MobileNetV2 (transfer learning)
+- Input size: 224x224x3
+- Optimizer: Adam
+- Loss: Binary crossentropy
+- Metrics: Accuracy, Precision, Recall
 
-2. **Create Virtual Environment**
-   ```bash
-   python -m venv venv
-   # On Windows
-   venv\Scripts\activate
-   # On macOS/Linux
-   source venv/bin/activate
-   ```
+**Model not included in repository due to size. Train locally using provided pipeline.**
 
-3. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## API Endpoints
 
-4. **Environment Configuration**
-   ```bash
-   # Create .env file in webapp/ directory
-   cd webapp
-   cp .env.example .env  # If provided, otherwise create manually
-   ```
+```
+POST /api/detect/
+- Upload images for analysis
+- Returns: prediction, confidence, detailed report
 
-   Configure the following in `.env`:
-   ```env
-   SECRET_KEY=your-secret-key-here
-   DEBUG=True
-   DATABASE_URL=sqlite:///db.sqlite3
-   # Add other required environment variables
-   ```
+GET /dashboard/
+- User analysis history
 
-5. **Database Setup**
-   ```bash
-   python manage.py migrate
-   python manage.py createsuperuser
-   ```
+GET /admin-report/<id>/
+- Detailed admin analysis report
+```
 
-6. **Collect Static Files**
-   ```bash
-   python manage.py collectstatic --noinput
-   ```
+## Future Improvements
 
-7. **Run Development Server**
-   ```bash
-   python manage.py runserver
-   ```
+- [ ] Add real-time barcode database integration
+- [ ] Implement blockchain for product verification
+- [ ] Add mobile app support
+- [ ] Integrate with government FSSAI database
+- [ ] Add multi-language OCR support
+- [ ] Implement batch processing API
+- [ ] Add explainable AI visualizations
+- [ ] Deploy to cloud (AWS/Azure)
 
-8. **Access the Application**
-   - Open browser and navigate to: `http://127.0.0.1:8000`
-   - Admin panel: `http://127.0.0.1:8000/admin`
+## License
 
-### Additional Setup for ML Features
+This project is for educational and research purposes.
 
-**Tesseract OCR Installation:**
-- **Windows**: Download from [GitHub releases](https://github.com/UB-Mannheim/tesseract/wiki)
-- **macOS**: `brew install tesseract`
-- **Linux**: `sudo apt-get install tesseract-ocr`
+## Contributors
 
-**ML Model Setup:**
-- Place trained model file (`mobilenet_v2_food.h5`) in `models/` directory
-- Ensure model file is not committed to version control
-
-## 🔮 Future Scope
-
-### Short-term Enhancements (3-6 months)
-- **📱 Mobile Application**: Native iOS/Android apps
-- **🌐 Multi-language Support**: OCR support for multiple languages
-- **📊 Advanced Analytics**: Detailed reporting and insights dashboard
-- **🔗 API Integration**: RESTful API for third-party integrations
-
-### Medium-term Goals (6-12 months)
-- **🧠 Improved AI Models**: Larger datasets and advanced architectures (ResNet, EfficientNet)
-- **📷 Real-time Detection**: Camera integration for instant verification
-- **🏪 Retail Integration**: POS system integration for automated scanning
-- **🌍 Global Expansion**: Support for international brands and regulations
-
-### Long-term Vision (1-2 years)
-- **🔬 Laboratory Verification**: Integration with certified testing labs
-- **🏛️ Regulatory Compliance**: Compliance with FDA, EU standards
-- **🤝 Industry Partnerships**: Collaboration with brand manufacturers
-- **📈 Enterprise Solutions**: B2B platform for large retailers
-
-## ⚠️ Disclaimer
-
-**Academic Project Notice**
-
-This project was developed as part of an academic exercise and serves as a demonstration of AI/ML concepts in product authenticity verification. While the system incorporates industry-standard practices, it should not be used as the sole method for product verification in commercial or critical applications.
-
-**Important Limitations:**
-- The AI model is trained on limited datasets and may not cover all product categories
-- OCR accuracy depends on image quality and text clarity
-- Results should be verified through official channels when possible
-- Not intended for legal or regulatory compliance purposes
-
-**Recommendations:**
-- Use as a supplementary tool alongside traditional verification methods
-- Consult with domain experts for critical applications
-- Regular model updates and validation are recommended for production use
+Developed as part of Major Project - Food Product Authentication System.
 
 ---
 
-**Developed with ❤️ for Consumer Safety and Brand Protection**
-
-For questions or contributions, please open an issue or submit a pull request.
-
-- Django
-- TensorFlow
-- OpenCV
-- Pytesseract OCR
-- TailwindCSS
-
-## Contributors
-- [Rajendra Singh, Raj Bhayal, Narayan Yaduwanshi, Rahul Panwar]
-
-## License
-[Your chosen license]
+**Note:** This system is a prototype. For production use, integrate with official databases and obtain necessary certifications.

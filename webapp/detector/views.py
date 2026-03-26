@@ -23,6 +23,8 @@ from .models import (CustomUser, UserProfile, FoodProduct, FoodImage,
                     Advertisement, GalleryItem, MediaItem, UserActivity, PasswordResetToken, UserFeedback)
 from .forms import CustomUserRegistrationForm, CustomUserLoginForm, UserProfileForm, CustomUserUpdateForm, MediaItemForm, AdvertisementForm, GalleryItemForm
 from .serializers import FoodProductSerializer, FoodImageSerializer
+from .validators import validate_image_upload
+from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +433,11 @@ class AdsUploadView(UserPassesTestMixin, TemplateView):
             duration = request.POST.get('duration')
 
             for file in files:
+                try:
+                    validate_image_upload(file)
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return self.get(request, *args, **kwargs)
                 Advertisement.objects.create(
                     title=title,
                     description=description,
@@ -474,6 +481,11 @@ class ProductGalleryView(UserPassesTestMixin, TemplateView):
             description = request.POST.get('description', '')
 
             for file in files:
+                try:
+                    validate_image_upload(file)
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return self.get(request, *args, **kwargs)
                 # Admin uploads are auto-approved, user uploads need approval
                 status = 'approved' if request.user.is_staff else 'pending'
                 GalleryItem.objects.create(
@@ -582,6 +594,13 @@ class FoodDetectorView(APIView):
 
             if len(images) != len(view_types):
                 return Response({'error': 'Number of images and view types must match'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Validate all images
+            for img in images:
+                try:
+                    validate_image_upload(img)
+                except ValidationError as e:
+                    return Response({'error': f'Invalid image: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
             # Create product with user association if authenticated
             user = request.user if request.user.is_authenticated else None
@@ -770,6 +789,12 @@ class AdvertisementCreateView(AdminRequiredMixin, View):
     def post(self, request):
         form = AdvertisementForm(request.POST, request.FILES)
         if form.is_valid():
+            if 'file' in request.FILES:
+                try:
+                    validate_image_upload(request.FILES['file'])
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return render(request, 'detector/admin/advertisement_form.html', {'form': form, 'action': 'Create'})
             advertisement = form.save(commit=False)
             advertisement.uploaded_by = request.user
             advertisement.save()
@@ -790,6 +815,12 @@ class AdvertisementUpdateView(AdminRequiredMixin, View):
         advertisement = get_object_or_404(Advertisement, pk=pk)
         form = AdvertisementForm(request.POST, request.FILES, instance=advertisement)
         if form.is_valid():
+            if 'file' in request.FILES:
+                try:
+                    validate_image_upload(request.FILES['file'])
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return render(request, 'detector/admin/advertisement_form.html', {'form': form, 'action': 'Update', 'advertisement': advertisement})
             form.save()
             messages.success(request, 'Advertisement updated successfully!')
             return redirect('detector:admin_advertisements')
@@ -849,6 +880,12 @@ class MediaItemCreateView(AdminRequiredMixin, View):
     def post(self, request):
         form = MediaItemForm(request.POST, request.FILES)
         if form.is_valid():
+            if 'file' in request.FILES:
+                try:
+                    validate_image_upload(request.FILES['file'])
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return render(request, 'detector/admin/media_form.html', {'form': form, 'action': 'Create'})
             media_item = form.save(commit=False)
             media_item.uploaded_by = request.user
             media_item.save()
@@ -869,6 +906,12 @@ class MediaItemUpdateView(AdminRequiredMixin, View):
         media_item = get_object_or_404(MediaItem, pk=pk)
         form = MediaItemForm(request.POST, request.FILES, instance=media_item)
         if form.is_valid():
+            if 'file' in request.FILES:
+                try:
+                    validate_image_upload(request.FILES['file'])
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return render(request, 'detector/admin/media_form.html', {'form': form, 'action': 'Update', 'media_item': media_item})
             form.save()
             messages.success(request, 'Media item updated successfully!')
             return redirect('detector:admin_media')
@@ -943,6 +986,12 @@ class GalleryItemCreateView(AdminRequiredMixin, View):
     def post(self, request):
         form = GalleryItemForm(request.POST, request.FILES)
         if form.is_valid():
+            if 'image' in request.FILES:
+                try:
+                    validate_image_upload(request.FILES['image'])
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return render(request, 'detector/admin/gallery_form.html', {'form': form, 'action': 'Create'})
             gallery_item = form.save(commit=False)
             gallery_item.uploaded_by = request.user
             gallery_item.save()
@@ -963,6 +1012,12 @@ class GalleryItemUpdateView(AdminRequiredMixin, View):
         gallery_item = get_object_or_404(GalleryItem, pk=pk)
         form = GalleryItemForm(request.POST, request.FILES, instance=gallery_item)
         if form.is_valid():
+            if 'image' in request.FILES:
+                try:
+                    validate_image_upload(request.FILES['image'])
+                except ValidationError as e:
+                    messages.error(request, f"Invalid file: {str(e)}")
+                    return render(request, 'detector/admin/gallery_form.html', {'form': form, 'action': 'Update', 'gallery_item': gallery_item})
             form.save()
             messages.success(request, 'Gallery item updated successfully!')
             return redirect('detector:admin_gallery')

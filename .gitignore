@@ -1,202 +1,110 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
+# Python
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
+*.pyc
+*.pyo
+__pycache__/
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+dist/
+build/
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
+# Django
 *.log
-local_settings.py
 db.sqlite3
 db.sqlite3-journal
+staticfiles/
+media/
+*.pot
+local_settings.py
 
-# Flask stuff:
-instance/
-.webassets-cache
+# Environment Variables
+.env
+.env.local
+.env.*.local
 
-# Scrapy stuff:
-.scrapy
+# ML Models & Datasets
+models/
+data/
+dataset/
+raw_data/
+training_data/
+processed_dataset/
+*.h5
+*.keras
+*.tflite
+*.pb
+*.ckpt
+*.pth
+*.pt
 
-# Sphinx documentation
-docs/_build/
+# Logs
+logs/
+*.log
+debug.log
 
-# PyBuilder
-target/
+# TensorBoard
+runs/
+tensorboard/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
 
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+*.bak
 
-# Project specific exclusions
-# Database files
-*.sqlite3
-*.db
-
-# Media files and uploads
-media/
-staticfiles/
-static/media/
-
-# ML model files (large binaries)
-*.h5
-*.hdf5
-*.pb
-*.tflite
-*.onnx
-models/
-
-# Training data (if large)
-data/training_data/
-
-# Logs
-logs/
-*.log
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
 
 # Temporary files
-tmp/
+*.tmp
 temp/
+tmp/
 
-# Secrets and credentials
-secrets.json
+# Credentials
+*.pem
+*.key
 credentials.json
-*.env.local
-.env.*.local
-
-# Internal documentation (development only)
+secrets.json
 ADMIN_CREDENTIALS.txt
+
+# Internal documentation
 COMPLETION_SUMMARY.md
 PROJECT_STATUS_REPORT.txt
+QUICK_REFERENCE.md
 TERMINAL_FIX.md
 TERMINAL_ISSUE_RESOLVED.md
+IMPLEMENTATION_COMPLETE.md
+MODEL_ENHANCEMENT_SUMMARY.md
+QUICK_START_TRAINING.md
+TRAINING_SUMMARY.txt
+model_pipeline/TRAINING_GUIDE.md
 
-# Local development scripts
-PUSH_TO_GITHUB.bat
+# Local scripts
 run_server.bat
-*.bat
+PUSH_TO_GITHUB.bat
 
-# Build artifacts
-*.tar.gz
-*.zip
-
-# Node.js (if any frontend build)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Large media files
+*.mp4
+*.avi
+*.mov
+*.mkv

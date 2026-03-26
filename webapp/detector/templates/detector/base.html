@@ -22,8 +22,48 @@
     
     <!-- Custom JavaScript -->
     <script src="{% static 'js/custom.js' %}" defer></script>
+
+    <!-- Theme CSS Variables & Overrides -->
+    <style>
+        :root {
+            --bg-color: #f9fafb;
+            --text-color: #111827;
+            --surface-color: #ffffff;
+            --border-color: #e5e7eb;
+            --muted-text: #6b7280;
+        }
+
+        .dark-mode {
+            --bg-color: #121212;
+            --text-color: #f3f4f6;
+            --surface-color: #1e1e1e;
+            --border-color: #374151;
+            --muted-text: #9ca3af;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        /* Gracefully override standard Tailwind classes for Dark Mode */
+        .dark-mode .bg-white { background-color: var(--surface-color) !important; }
+        .dark-mode .bg-gray-50 { background-color: var(--bg-color) !important; }
+        .dark-mode .hover\:bg-gray-100:hover { background-color: #374151 !important; }
+        .dark-mode .hover\:bg-gray-50:hover { background-color: #1f2937 !important; }
+        .dark-mode .text-gray-900, .dark-mode .text-gray-800, .dark-mode .text-gray-700 { color: var(--text-color) !important; }
+        .dark-mode .text-gray-500, .dark-mode .text-gray-400 { color: var(--muted-text) !important; }
+        .dark-mode .border-gray-200 { border-color: var(--border-color) !important; }
+        .dark-mode .shadow-lg, .dark-mode .shadow-xl { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important; }
+    </style>
 </head>
-<body class="flex flex-col min-h-screen bg-gray-50">
+<body id="theme-body" class="flex flex-col min-h-screen bg-gray-50 transition-colors duration-300">
+    <!-- FOUC Prevention: Instantly apply theme before rendering DOM -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.getElementById('theme-body').classList.add('dark-mode');
+        }
+    </script>
     <!-- Navigation -->
     <nav class="bg-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -86,6 +126,9 @@
 
                 <!-- User Menu (Right Side Only) -->
                 <div class="flex items-center space-x-4">
+                    <button id="theme-toggle" class="inline-flex items-center justify-center h-10 w-10 rounded-full border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Toggle dark/light mode" title="Toggle dark/light mode">
+                        <span id="theme-icon" class="text-lg">🌙</span>
+                    </button>
                     {% if user.is_authenticated %}
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-3 bg-white px-4 py-2 rounded-lg hover:bg-gray-50 transition duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -313,6 +356,27 @@
                 }
             });
         }
+
+        // Dark/Light theme toggle
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggle = document.getElementById('theme-toggle');
+            const body = document.getElementById('theme-body');
+            const icon = document.getElementById('theme-icon');
+            
+            if (!toggle || !body || !icon) return;
+
+            // Set the correct icon on load based on FOUC script application
+            icon.textContent = body.classList.contains('dark-mode') ? '☀️' : '🌙';
+
+            toggle.addEventListener('click', () => {
+                body.classList.toggle('dark-mode');
+                const isDark = body.classList.contains('dark-mode');
+                
+                icon.textContent = isDark ? '☀️' : '🌙';
+                icon.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            });
+        });
     </script>
     
     <!-- CSRF helper for AJAX requests -->
