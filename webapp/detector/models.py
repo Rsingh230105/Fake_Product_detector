@@ -1,5 +1,9 @@
+import os
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -48,6 +52,16 @@ class CustomUser(AbstractUser):
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
+    @property
+    def profile_picture_url(self):
+        """Return profile picture URL or None (template uses default fallback)."""
+        if self.profile_picture and hasattr(self.profile_picture, 'url'):
+            try:
+                return self.profile_picture.url
+            except Exception:
+                pass
+        return None
+
 class UserProfile(models.Model):
     """Extended user profile information"""
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='profile')
@@ -69,6 +83,15 @@ class UserProfile(models.Model):
     
     def __str__(self):
         return f"{self.user.email} Profile"
+
+
+# ── Signals ──────────────────────────────────────────────────────────────────
+
+@receiver(post_save, sender='detector.CustomUser')
+def create_or_save_user_profile(sender, instance, created, **kwargs):
+    """Auto-create UserProfile when a new CustomUser is saved."""
+    if created:
+        UserProfile.objects.get_or_create(user=instance)
 
 class FoodProduct(models.Model):
     """Model for storing food product analysis with ML and OCR results"""

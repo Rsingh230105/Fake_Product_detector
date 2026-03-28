@@ -121,7 +121,7 @@ class UserProfileForm(forms.ModelForm):
         }
 
 class CustomUserUpdateForm(forms.ModelForm):
-    """Form for updating user information"""
+    """Form for updating user information including profile picture."""
     class Meta:
         model = CustomUser
         fields = ['first_name', 'last_name', 'phone_number', 'profile_picture']
@@ -129,8 +129,24 @@ class CustomUserUpdateForm(forms.ModelForm):
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'profile_picture': forms.FileInput(attrs={'class': 'form-control'}),
+            'profile_picture': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/jpeg,image/png,image/webp'
+            }),
         }
+
+    def clean_profile_picture(self):
+        image = self.cleaned_data.get('profile_picture')
+        if image and hasattr(image, 'size'):
+            # 5 MB limit
+            if image.size > 5 * 1024 * 1024:
+                raise forms.ValidationError('Image file too large. Maximum size is 5MB.')
+            # MIME type check
+            allowed = {'image/jpeg', 'image/png', 'image/webp'}
+            content_type = getattr(image, 'content_type', '')
+            if content_type and content_type not in allowed:
+                raise forms.ValidationError('Only JPEG, PNG, and WebP images are allowed.')
+        return image
 
 class AdvertisementForm(forms.ModelForm):
     """Form for creating and editing advertisements/awareness content"""

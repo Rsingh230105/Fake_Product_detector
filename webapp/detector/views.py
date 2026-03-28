@@ -1,6 +1,7 @@
 """Detector app views."""
 
 import logging
+import os
 import secrets
 
 from django.conf import settings
@@ -324,25 +325,28 @@ class ProfileView(LoginRequiredMixin, View):
     def post(self, request):
         user = request.user
         profile, created = UserProfile.objects.get_or_create(user=user)
-        
+
         user_form = CustomUserUpdateForm(request.POST, request.FILES, instance=user)
         profile_form = UserProfileForm(request.POST, instance=profile)
-        
+
         if user_form.is_valid() and profile_form.is_valid():
             try:
                 with transaction.atomic():
+                    # Delete old profile picture from disk before saving new one
+                    if 'profile_picture' in request.FILES and user.profile_picture:
+                        old_path = user.profile_picture.path
+                        if os.path.isfile(old_path):
+                            os.remove(old_path)
+
                     user_form.save()
                     profile_form.save()
-                    
-                    # Log profile update activity
                     log_user_activity(user, 'profile_update', 'Profile updated successfully', request)
-                    
                     messages.success(request, 'Profile updated successfully!')
                     return redirect('detector:profile')
             except Exception as e:
                 logger.error(f"Profile update error: {str(e)}")
                 messages.error(request, 'Profile update failed. Please try again.')
-        
+
         context = {
             'user_form': user_form,
             'profile_form': profile_form,
