@@ -1,32 +1,38 @@
-"""Detector app views with complete authentication system."""
+"""Detector app views."""
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser
-from django.views.generic import TemplateView, View
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.http import JsonResponse
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q
-from django.core.paginator import Paginator
-from django.utils import timezone
-from django.db import transaction
 import logging
+import secrets
 
-from .models import (CustomUser, UserProfile, FoodProduct, FoodImage, 
-                    Advertisement, GalleryItem, MediaItem, UserActivity, PasswordResetToken, UserFeedback)
-from .forms import CustomUserRegistrationForm, CustomUserLoginForm, UserProfileForm, CustomUserUpdateForm, MediaItemForm, AdvertisementForm, GalleryItemForm
-from .serializers import FoodProductSerializer, FoodImageSerializer
-from .validators import validate_image_upload
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Q
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views.generic import TemplateView, View
+from rest_framework import status
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .forms import (AdvertisementForm, CustomUserLoginForm,
+                    CustomUserRegistrationForm, CustomUserUpdateForm,
+                    GalleryItemForm, MediaItemForm, UserProfileForm)
+from .models import (Advertisement, CustomUser, FoodImage, FoodProduct,
+                     GalleryItem, MediaItem, PasswordResetToken, UserActivity,
+                     UserFeedback, UserProfile)
+from .validators import validate_image_upload
 
 logger = logging.getLogger(__name__)
+
 
 def log_user_activity(user, activity_type, description="", request=None):
     """Helper function to log user activities"""
@@ -156,7 +162,6 @@ class ForgotPasswordView(View):
             return render(request, self.template_name)
         
         # Generate token
-        import secrets
         token = secrets.token_urlsafe(32)
         expires_at = timezone.now() + timezone.timedelta(minutes=15)
         
@@ -168,9 +173,6 @@ class ForgotPasswordView(View):
         )
         
         # Send email
-        from django.core.mail import send_mail
-        from django.conf import settings
-        
         reset_url = request.build_absolute_uri(f'/reset-password/{token}/')
         subject = 'Password Reset Request'
         message = f'''
@@ -630,7 +632,6 @@ class FoodDetectorView(APIView):
             # Process images with detailed analysis
             from .utils.ml_utils import process_product_images
             from .utils.report_generator import generate_user_friendly_report
-            
             analysis_result = process_product_images(image_data, brand_name)
             
             # Generate user-friendly report
@@ -1067,8 +1068,6 @@ class SimpleResultView(TemplateView):
     def dispatch(self, request, *args, **kwargs):
         # Redirect admins to admin report instead
         if request.user.is_staff:
-            from django.shortcuts import redirect
-            from django.urls import reverse
             product_id = kwargs.get('product_id')
             return redirect(reverse('detector:admin_analysis_report', kwargs={'product_id': product_id}))
         return super().dispatch(request, *args, **kwargs)
@@ -1114,21 +1113,14 @@ class UserFriendlyResultView(TemplateView):
             return context
 
 class AwarenessCampaignView(TemplateView):
-    """Public view for awareness campaigns and advertisements"""
+    """Public view for awareness campaigns and advertisements."""
     template_name = 'detector/awareness.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Get active advertisements
         advertisements = Advertisement.objects.filter(is_active=True).order_by('-created_at')
-        
-        # Get approved gallery items
         gallery_items = GalleryItem.objects.filter(status='approved').order_by('-created_at')
-        
-        # Featured items
         featured_gallery = gallery_items.filter(is_featured=True)[:6]
-        
         context.update({
             'advertisements': advertisements,
             'gallery_items': gallery_items,
@@ -1136,22 +1128,19 @@ class AwarenessCampaignView(TemplateView):
         })
         return context
 
+
 class MediaLibraryView(TemplateView):
-    """Public view for media library - shows approved media items"""
+    """Public view for media library — shows approved media items."""
     template_name = 'detector/media_library.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Only show approved media items
         media_items = MediaItem.objects.filter(status='approved').order_by('-created_at')
-        
-        # Filter by media type
+
         media_type = self.request.GET.get('type', '')
         if media_type:
             media_items = media_items.filter(media_type=media_type)
-        
-        # Search functionality
+
         search_query = self.request.GET.get('search', '')
         if search_query:
             media_items = media_items.filter(
@@ -1159,12 +1148,9 @@ class MediaLibraryView(TemplateView):
                 Q(description__icontains=search_query) |
                 Q(tags__icontains=search_query)
             )
-        
-        # Pagination
+
         paginator = Paginator(media_items, 12)
-        page_number = self.request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-        
+        page_obj = paginator.get_page(self.request.GET.get('page'))
         context.update({
             'media_items': page_obj,
             'search_query': search_query,
@@ -1173,78 +1159,51 @@ class MediaLibraryView(TemplateView):
         })
         return context
 
+
 class AdminAnalysisReportView(AdminRequiredMixin, TemplateView):
-    """Dedicated admin analysis report view"""
+    """Dedicated admin analysis report view."""
     template_name = 'detector/admin_analysis_report.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         product_id = kwargs.get('product_id')
-        
         try:
             product = FoodProduct.objects.get(id=product_id)
             context['product'] = product
-            
-            # Generate copy-level estimation for fake products
             if product.final_prediction != 'Real':
                 context['copy_analysis'] = self._generate_copy_analysis(product)
-            
-            return context
         except FoodProduct.DoesNotExist:
             messages.error(self.request, 'Analysis result not found.')
             context['error'] = True
-            return context
-    
+        return context
+
     def _generate_copy_analysis(self, product):
-        """Generate copy-level estimation for fake products"""
+        """Generate copy-level estimation for fake products."""
+        logo_score = product.logo_score or 0
+        packaging_score = product.packaging_score or 0
         return {
-            'barcode_copied': product.barcode_score < 50,
-            'text_copied': 'Partial' if product.ocr_score > 30 else 'Full' if product.ocr_score > 0 else 'None',
-            'logo_copied': 'Partial' if product.logo_score > 30 else 'None',
-            'overall_similarity': max(product.logo_score, product.packaging_score)
+            'barcode_copied': (product.barcode_score or 0) < 50,
+            'text_copied': 'Partial' if (product.ocr_score or 0) > 30 else 'Full' if (product.ocr_score or 0) > 0 else 'None',
+            'logo_copied': 'Partial' if logo_score > 30 else 'None',
+            'overall_similarity': max(logo_score, packaging_score),
         }
 
+
 class AnalysisResultView(TemplateView):
-    """View for displaying detailed analysis results"""
+    """View for displaying detailed analysis results."""
     template_name = 'detector/analysis_result.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         product_id = kwargs.get('product_id')
-        
         try:
             product = FoodProduct.objects.get(id=product_id)
-            # Check if user has permission to view this analysis
             if product.user and self.request.user != product.user and not self.request.user.is_staff:
-                messages.error(self.request, "You don't have permission to view this analysis")
+                messages.error(self.request, "You don't have permission to view this analysis.")
                 context['error'] = True
                 return context
-            
             context['product'] = product
-            return context
         except FoodProduct.DoesNotExist:
             messages.error(self.request, 'Analysis result not found.')
             context['error'] = True
-            return context
-
-    """Public view for awareness campaigns and advertisements"""
-    template_name = 'detector/awareness.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Get active advertisements
-        advertisements = Advertisement.objects.filter(is_active=True).order_by('-created_at')
-        
-        # Get approved gallery items
-        gallery_items = GalleryItem.objects.filter(status='approved').order_by('-created_at')
-        
-        # Featured items
-        featured_gallery = gallery_items.filter(is_featured=True)[:6]
-        
-        context.update({
-            'advertisements': advertisements,
-            'gallery_items': gallery_items,
-            'featured_gallery': featured_gallery,
-        })
         return context

@@ -202,7 +202,7 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@fakeproductdetecto
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer' if DEBUG else None,
+        *(['rest_framework.renderers.BrowsableAPIRenderer'] if DEBUG else []),
     ),
     'DEFAULT_PARSER_CLASSES': (
         'rest_framework.parsers.JSONParser',
@@ -220,14 +220,14 @@ REST_FRAMEWORK = {
 }
 
 # ML Model settings
-ML_MODEL_PATH = os.getenv('ML_MODEL_PATH', BASE_DIR.parent / 'models' / 'mobilenet_v2_food.h5')
+ML_MODEL_PATH = os.getenv('ML_MODEL_PATH', str(BASE_DIR.parent / 'models' / 'mobilenet_v2_food_production.keras'))
 IMAGE_SIZE = (224, 224)  # MobileNetV2 input size
 ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB max file size
 
-# Tesseract OCR settings
-TESSERACT_CMD = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-TESSDATA_PREFIX = r'C:\Program Files\Tesseract-OCR\tessdata'
+# Tesseract OCR — override via env var for cross-platform support
+TESSERACT_CMD = os.getenv('TESSERACT_CMD', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+TESSDATA_PREFIX = os.getenv('TESSDATA_PREFIX', r'C:\Program Files\Tesseract-OCR\tessdata')
 
 # Logging configuration
 LOGGING = {

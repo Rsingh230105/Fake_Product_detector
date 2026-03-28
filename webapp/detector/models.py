@@ -230,6 +230,9 @@ class UserActivity(models.Model):
         ('upload', 'Image Upload'),
         ('analysis', 'Product Analysis'),
         ('profile_update', 'Profile Update'),
+        ('register', 'User Registration'),
+        ('password_reset', 'Password Reset'),
+        ('feedback', 'Feedback Submitted'),
     ]
     
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='activities')
