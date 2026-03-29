@@ -215,6 +215,7 @@ if not DEBUG:
 
 # ML Model settings
 ML_MODEL_PATH = os.getenv('ML_MODEL_PATH', str(BASE_DIR.parent / 'models' / 'mobilenet_v2_food_production.keras'))
+MODEL_URL = os.getenv("MODEL_URL")
 IMAGE_SIZE = (224, 224)  # MobileNetV2 input size
 ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB max file size
