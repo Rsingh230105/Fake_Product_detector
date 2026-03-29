@@ -214,6 +214,7 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 
 # ML Model settings
+ML_MODEL_URL = os.getenv('ML_MODEL_URL')
 ML_MODEL_PATH = os.getenv('ML_MODEL_PATH', str(BASE_DIR.parent / 'models' / 'mobilenet_v2_food_production.keras'))
 MODEL_URL = os.getenv("MODEL_URL")
 IMAGE_SIZE = (224, 224)  # MobileNetV2 input size
