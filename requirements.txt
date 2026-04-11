@@ -9,14 +9,12 @@ phonenumbers==9.0.24
 gunicorn==21.2.0
 
 # ── ML / Deep Learning ────────────────────────────────────────────────────────
-# tensorflow-cpu: no GPU on Render, saves ~500MB install size
-# 2.15.1: supports Python 3.10, reads .keras format saved by TF 2.x
-# numpy <2.0 required by TF 2.15
-tensorflow-cpu==2.15.1
-numpy==1.26.4
+# tensorflow 2.13.0: supports Python 3.10, stable on Render
+# numpy <2.0 required by TF 2.13
+tensorflow==2.13.0
+numpy==1.24.4
 
 # ── Image Processing ──────────────────────────────────────────────────────────
-# headless: no GUI/display dependencies needed on server
 opencv-python-headless==4.8.1.78
 Pillow==10.4.0
 
