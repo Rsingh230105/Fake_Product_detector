@@ -12,7 +12,6 @@ class CustomUserRegistrationForm(UserCreationForm):
             'class': 'appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm',
             'placeholder': 'Email address',
             'required': 'required',
-            'pattern': r'[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'
         })
     )
     first_name = forms.CharField(
@@ -41,7 +40,6 @@ class CustomUserRegistrationForm(UserCreationForm):
             'placeholder': 'Password (min 8 characters)',
             'required': 'required',
             'minlength': '8',
-            'pattern': r'(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}'
         })
     )
     password2 = forms.CharField(

@@ -115,67 +115,48 @@
 </div>
 
 <script>
-// Client-side validation
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
+    const form      = document.querySelector('form');
     const password1 = document.querySelector('input[name="password1"]');
     const password2 = document.querySelector('input[name="password2"]');
-    
-    // Password confirmation validation
-    function validatePasswordConfirmation() {
-        if (password1.value !== password2.value) {
+
+    function validatePasswords() {
+        if (password1.value && password2.value && password1.value !== password2.value) {
             password2.setCustomValidity('Passwords do not match');
-            password2.classList.add('border-red-500');
-            return false;
         } else {
             password2.setCustomValidity('');
-            password2.classList.remove('border-red-500');
-            return true;
         }
     }
-    
-    password2.addEventListener('input', validatePasswordConfirmation);
-    password1.addEventListener('input', validatePasswordConfirmation);
-    
-    // Form submission validation
+
+    password1.addEventListener('input', validatePasswords);
+    password2.addEventListener('input', validatePasswords);
+
     form.addEventListener('submit', function(e) {
-        if (!validatePasswordConfirmation()) {
-            e.preventDefault();
-            alert('Passwords do not match. Please check and try again.');
-            return false;
-        }
-        
-        // Additional validations
-        const email = document.querySelector('input[name="email"]');
         const firstName = document.querySelector('input[name="first_name"]');
-        const lastName = document.querySelector('input[name="last_name"]');
-        
-        if (!email.value.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/)) {
+        const lastName  = document.querySelector('input[name="last_name"]');
+
+        if (firstName.value.trim().length < 2) {
             e.preventDefault();
-            alert('Please enter a valid email address.');
-            email.focus();
-            return false;
-        }
-        
-        if (firstName.value.length < 2) {
-            e.preventDefault();
-            alert('First name must be at least 2 characters long.');
+            alert('First name must be at least 2 characters.');
             firstName.focus();
-            return false;
+            return;
         }
-        
-        if (lastName.value.length < 2) {
+        if (lastName.value.trim().length < 2) {
             e.preventDefault();
-            alert('Last name must be at least 2 characters long.');
+            alert('Last name must be at least 2 characters.');
             lastName.focus();
-            return false;
+            return;
         }
-        
         if (password1.value.length < 8) {
             e.preventDefault();
-            alert('Password must be at least 8 characters long and contain uppercase, lowercase, and number.');
+            alert('Password must be at least 8 characters.');
             password1.focus();
-            return false;
+            return;
+        }
+        if (password1.value !== password2.value) {
+            e.preventDefault();
+            alert('Passwords do not match.');
+            password2.focus();
         }
     });
 });
