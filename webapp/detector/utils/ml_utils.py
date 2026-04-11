@@ -189,7 +189,7 @@ class MLPredictor:
 # SINGLETON
 # ──────────────────────────────────────────────────────────────────────────────
 
-_predictor: MLPredictor | None = None
+_predictor: "MLPredictor | None" = None
 
 
 def get_ml_predictor() -> MLPredictor:

@@ -9,12 +9,13 @@ phonenumbers==9.0.24
 gunicorn==21.2.0
 
 # ── ML / Deep Learning ────────────────────────────────────────────────────────
-tensorflow==2.20.0
-numpy==2.4.2
+# TF 2.15: last version supporting Python 3.11, compatible with .keras format
+tensorflow-cpu==2.15.1
+numpy==1.26.4
 
 # ── Image Processing ──────────────────────────────────────────────────────────
 opencv-python-headless==4.10.0.84
-Pillow==12.1.1
+Pillow==10.4.0
 
 # ── OCR & Barcode ─────────────────────────────────────────────────────────────
 pytesseract==0.3.10
