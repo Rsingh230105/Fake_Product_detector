@@ -9,12 +9,15 @@ phonenumbers==9.0.24
 gunicorn==21.2.0
 
 # ── ML / Deep Learning ────────────────────────────────────────────────────────
-# TF 2.15: last version supporting Python 3.11, compatible with .keras format
+# tensorflow-cpu: no GPU on Render, saves ~500MB install size
+# 2.15.1: supports Python 3.10, reads .keras format saved by TF 2.x
+# numpy <2.0 required by TF 2.15
 tensorflow-cpu==2.15.1
 numpy==1.26.4
 
 # ── Image Processing ──────────────────────────────────────────────────────────
-opencv-python-headless==4.10.0.84
+# headless: no GUI/display dependencies needed on server
+opencv-python-headless==4.8.1.78
 Pillow==10.4.0
 
 # ── OCR & Barcode ─────────────────────────────────────────────────────────────
