@@ -41,17 +41,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
-    
-    # Third party apps
+
+    # Third party
     'rest_framework',
     'corsheaders',
-    'whitenoise',
-    # 'allauth',
-    # 'allauth.account',
-    # 'allauth.socialaccount',
-    # 'allauth.socialaccount.providers.google',
-    
-    # Local apps
+
+    # Local
     'detector.apps.DetectorConfig',
 ]
 
@@ -134,16 +129,16 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+# Static files
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
-# Media files (Uploaded images)
-MEDIA_URL = 'media/'
+# Media files (user uploads — not served by WhiteNoise)
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# WhiteNoise configuration for static files
+# WhiteNoise — compress and cache static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
@@ -205,43 +200,38 @@ REST_FRAMEWORK = {
     }
 }
 
-# Security headers (enforced in production when DEBUG=False)
+# Security headers — only enforce HTTPS-related headers in production.
+# NOTE: SECURE_SSL_REDIRECT is intentionally OFF because Render terminates
+# SSL at its load balancer. Enabling it would cause redirect loops.
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-# ML Model settings
+# ML Model
 ML_MODEL_URL = os.getenv('ML_MODEL_URL')
-ML_MODEL_PATH = os.getenv('ML_MODEL_PATH', str(BASE_DIR.parent / 'models' / 'mobilenet_v2_food_production.keras'))
-MODEL_URL = os.getenv("MODEL_URL")
-IMAGE_SIZE = (224, 224)  # MobileNetV2 input size
-ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB max file size
+ML_MODEL_PATH = os.getenv(
+    'ML_MODEL_PATH',
+    str(BASE_DIR.parent / 'models' / 'mobilenet_v2_food_production.keras')
+)
 
 # Tesseract OCR — override via env var for cross-platform support
 TESSERACT_CMD = os.getenv('TESSERACT_CMD', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
 TESSDATA_PREFIX = os.getenv('TESSDATA_PREFIX', r'C:\Program Files\Tesseract-OCR\tessdata')
 
-# Logging configuration
+# Logging — console only on Render (no writable filesystem for log files)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
     },
     'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'debug.log',
-            'formatter': 'verbose',
-        },
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
@@ -249,9 +239,9 @@ LOGGING = {
     },
     'loggers': {
         'detector': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
         },
     },
 }
