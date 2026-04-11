@@ -63,11 +63,9 @@ class CustomUserRegistrationForm(UserCreationForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
-        user.username = self.cleaned_data['email']  # Use email as username
+        user.username = self.cleaned_data['email']
         if commit:
-            user.save()
-            # Create user profile
-            UserProfile.objects.create(user=user)
+            user.save()  # signal auto-creates UserProfile
         return user
 
 class CustomUserLoginForm(AuthenticationForm):
