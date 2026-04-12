@@ -1,21 +1,29 @@
 #!/usr/bin/env bash
-set -e
+# build.sh - Production build script for Render deployment
 
-echo "==> Python version check"
-python --version
+set -o errexit  # Exit on any error
 
-echo "==> Installing system packages (tesseract, zbar)"
-apt-get install -y tesseract-ocr libzbar0 2>/dev/null || echo "apt-get skipped (not root or already installed)"
+echo "🚀 Starting build process..."
 
-echo "==> Installing Python dependencies"
+# Update pip to latest version
+echo "📦 Updating pip..."
 pip install --upgrade pip
+
+# Install Python dependencies
+echo "📦 Installing dependencies..."
 pip install -r requirements.txt
 
-echo "==> Collecting static files"
-cd webapp
-python manage.py collectstatic --noinput
+# Create models directory for ML model storage
+echo "📁 Creating models directory..."
+mkdir -p models
 
-echo "==> Running database migrations"
-python manage.py migrate --noinput
+# Collect static files for Django
+echo "🎨 Collecting static files..."
+python webapp/manage.py collectstatic --no-input
 
-echo "==> Build complete"
+# Run database migrations
+echo "🗄️ Running database migrations..."
+python webapp/manage.py migrate --no-input
+
+echo "✅ Build completed successfully!"
+echo "🎯 Ready for deployment on Render"

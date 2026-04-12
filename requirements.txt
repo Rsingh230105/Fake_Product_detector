@@ -8,9 +8,8 @@ phonenumbers==9.0.24
 # ── Production Server ─────────────────────────────────────────────────────────
 gunicorn==21.2.0
 
-# ── ML / Deep Learning ────────────────────────────────────────────────────────
-# tensorflow 2.15.0: better compatibility with .keras format
-# keras 2.15.0: matches tensorflow version
+# ── ML / Deep Learning (FIXED VERSIONS) ──────────────────────────────────────
+# Compatible versions that work together
 tensorflow==2.15.0
 keras==2.15.0
 numpy==1.24.3

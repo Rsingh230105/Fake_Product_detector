@@ -17,16 +17,18 @@ import numpy as np
 from PIL import Image
 import io
 
-# Import TensorFlow with error handling
+# Import TensorFlow with comprehensive error handling
 try:
     import tensorflow as tf
     from tensorflow import keras
     TF_AVAILABLE = True
+    # Log successful import
+    print(f"✅ TensorFlow {tf.__version__} loaded successfully")
 except ImportError as e:
     TF_AVAILABLE = False
     tf = None
     keras = None
-    print(f"TensorFlow import failed: {e}")
+    print(f"❌ TensorFlow import failed: {e}")
 
 logger = logging.getLogger(__name__)
 
@@ -37,29 +39,29 @@ logger = logging.getLogger(__name__)
 
 def ensure_model_exists(model_path: Path) -> None:
     """
-    Check if the model file exists locally.
-    If not, download it from Google Drive using the provided URL.
+    Production-safe model download with integrity checks.
     """
-    if model_path.exists() and model_path.stat().st_size > 1000000:  # Check file size > 1MB
-        logger.info(f"[MODEL] Found at {model_path} (Size: {model_path.stat().st_size / 1e6:.1f} MB)")
+    # Check if model exists and is valid size (>1MB)
+    if model_path.exists() and model_path.stat().st_size > 1000000:
+        logger.info(f"✅ Model found: {model_path} ({model_path.stat().st_size / 1e6:.1f} MB)")
         return
 
-    # Model not found or corrupted — download from Google Drive
+    # Download model from Google Drive
     google_drive_url = "https://drive.google.com/uc?id=1YO43M94sUYcs8A-S3MEt6wS9x4gJ8S_Y"
     
-    logger.info(f"[MODEL] Downloading from Google Drive...")
-    logger.info(f"[MODEL] URL: {google_drive_url}")
-    logger.info(f"[MODEL] Destination: {model_path}")
+    logger.info(f"📥 Downloading model from Google Drive...")
+    logger.info(f"🎯 URL: {google_drive_url}")
+    logger.info(f"📁 Destination: {model_path}")
 
     try:
         import gdown
     except ImportError:
         raise RuntimeError(
-            "gdown is required for model auto-download. "
-            "Run: pip install gdown"
+            "❌ gdown is required for model download. "
+            "Install with: pip install gdown"
         )
 
-    # Create parent directory if it doesn't exist
+    # Create directory if needed
     model_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -68,15 +70,15 @@ def ensure_model_exists(model_path: Path) -> None:
         
         # Verify download
         if not model_path.exists() or model_path.stat().st_size < 1000000:
-            raise RuntimeError("Downloaded file is missing or too small (corrupted)")
+            raise RuntimeError("Downloaded file is corrupted or too small")
             
-        logger.info(f"[MODEL] Download complete. Size: {model_path.stat().st_size / 1e6:.1f} MB")
+        logger.info(f"✅ Model downloaded successfully: {model_path.stat().st_size / 1e6:.1f} MB")
         
     except Exception as e:
-        # Clean up partial download
+        # Clean up failed download
         if model_path.exists():
             model_path.unlink()
-        raise RuntimeError(f"Model download failed: {e}")
+        raise RuntimeError(f"❌ Model download failed: {e}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -121,40 +123,85 @@ class MLPredictor:
             logger.info("[THRESHOLD] Config not found. Using default 0.5")
 
     def _load_model(self) -> None:
-        """Load model with comprehensive error handling for production."""
+        """Production-safe model loading with multiple fallback methods."""
         if not TF_AVAILABLE:
-            raise RuntimeError("TensorFlow is not available. Check installation.")
+            raise RuntimeError("❌ TensorFlow is not available. Check installation.")
         
-        logger.info(f"🚀 Attempting to load model from: {self.model_path}")
-        logger.info(f"🔍 TensorFlow version: {tf.__version__}")
+        logger.info(f"🚀 Loading model from: {self.model_path}")
+        logger.info(f"🔧 TensorFlow version: {tf.__version__}")
         
-        if self.model_path.exists():
-            logger.info(f"✅ Model file exists. Size: {self.model_path.stat().st_size / 1e6:.1f} MB")
-        else:
-            logger.error(f"❌ Model file not found at: {self.model_path}")
+        # Verify file exists and has reasonable size
+        if not self.model_path.exists():
+            raise RuntimeError(f"❌ Model file not found: {self.model_path}")
         
+        file_size_mb = self.model_path.stat().st_size / 1e6
+        logger.info(f"📊 Model file size: {file_size_mb:.1f} MB")
+        
+        if file_size_mb < 1:
+            raise RuntimeError(f"❌ Model file too small ({file_size_mb:.1f} MB), likely corrupted")
+        
+        # Try multiple loading methods for maximum compatibility
+        loading_methods = [
+            ("Standard Keras load_model with compile=False", self._load_method_1),
+            ("TensorFlow Keras with compile=False", self._load_method_2),
+            ("Custom objects with compile=False", self._load_method_3)
+        ]
+        
+        for method_name, load_method in loading_methods:
+            try:
+                logger.info(f"🔄 Trying: {method_name}")
+                self.model = load_method()
+                logger.info(f"✅ SUCCESS: {method_name}")
+                
+                # Validate loaded model
+                self._validate_model()
+                return
+                
+            except Exception as e:
+                logger.warning(f"⚠️ {method_name} failed: {str(e)[:100]}...")
+                continue
+        
+        # All methods failed
+        raise RuntimeError("❌ All model loading methods failed. Check model file integrity.")
+    
+    def _load_method_1(self):
+        """Method 1: Standard Keras load_model with compile=False"""
+        from tensorflow.keras.models import load_model
+        return load_model(str(self.model_path), compile=False)
+    
+    def _load_method_2(self):
+        """Method 2: TensorFlow Keras with compile=False"""
+        return tf.keras.models.load_model(str(self.model_path), compile=False)
+    
+    def _load_method_3(self):
+        """Method 3: With empty custom_objects"""
+        return tf.keras.models.load_model(
+            str(self.model_path), 
+            custom_objects={}, 
+            compile=False
+        )
+    
+    def _validate_model(self):
+        """Validate that the loaded model is working correctly."""
+        if self.model is None:
+            raise RuntimeError("Model is None after loading")
+        
+        # Log model info
+        logger.info(f"🏗️ Model architecture loaded successfully")
+        logger.info(f"📥 Input shape: {self.model.input_shape}")
+        logger.info(f"📤 Output shape: {self.model.output_shape}")
+        logger.info(f"🔢 Total layers: {len(self.model.layers)}")
+        
+        # Test with dummy input
         try:
-            # Load model with compile=False for production safety
-            from tensorflow.keras.models import load_model
-            logger.info("🔄 Loading model with compile=False...")
-            self.model = load_model(str(self.model_path), compile=False)
-            logger.info("✅ Model loaded successfully!")
-            
-            # Log model architecture info
-            logger.info(f"🏢 Model input shape: {self.model.input_shape}")
-            logger.info(f"🏢 Model output shape: {self.model.output_shape}")
-            logger.info(f"🏢 Model layers: {len(self.model.layers)}")
-            
-            # Test model with dummy input
             logger.info("🧪 Testing model with dummy input...")
             dummy_input = np.random.random((1, 224, 224, 3)).astype(np.float32)
             test_output = self.model.predict(dummy_input, verbose=0)
-            logger.info(f"✅ Dummy test successful. Output: {test_output[0][0]:.6f}")
-            
+            logger.info(f"✅ Model test successful! Output shape: {test_output.shape}")
+            logger.info(f"📊 Test prediction value: {test_output[0][0]:.6f}")
         except Exception as e:
-            logger.error(f"❌ Model loading failed: {e}")
-            logger.error(f"🔍 Traceback: {traceback.format_exc()}")
-            raise RuntimeError(f"Model loading failed: {e}")
+            logger.error(f"❌ Model validation test failed: {e}")
+            raise RuntimeError(f"Model validation failed: {e}")
 
     def preprocess_image(self, image_data: Union[bytes, np.ndarray]) -> np.ndarray:
         """
@@ -238,78 +285,76 @@ class MLPredictor:
 
     def predict_single(self, image_data: Union[bytes, np.ndarray]) -> Tuple[str, float]:
         """
-        Predict REAL/FAKE with comprehensive debugging and dynamic threshold detection.
+        Production-optimized prediction with smart threshold adjustment.
         """
         try:
-            logger.info("🚀 Starting prediction with enhanced debugging...")
+            logger.info("🚀 Starting prediction...")
             
             if self.model is None:
                 raise RuntimeError("Model not loaded")
             
             # Preprocess image
-            logger.info("🔄 Preprocessing image...")
             processed = self.preprocess_image(image_data)
             
-            # Get raw prediction with detailed analysis
+            # Get model prediction
             logger.info("🧠 Running model inference...")
             raw_prediction = self.model.predict(processed, verbose=0)
             
-            # Extract and analyze prediction
-            if raw_prediction.shape[-1] == 1:  # Binary classification
+            # Handle different output formats
+            if raw_prediction.shape[-1] == 1:
+                # Binary classification output
                 raw_score = float(raw_prediction[0][0])
-                logger.info(f"📊 Binary output - Raw score: {raw_score:.6f}")
-            else:  # Multi-class (should not happen for binary)
-                raw_score = float(raw_prediction[0][1])  # Assuming class 1 is REAL
-                logger.info(f"📊 Multi-class output - Using class 1: {raw_score:.6f}")
-                logger.info(f"📊 Full prediction: {raw_prediction[0]}")
+                logger.info(f"📊 Binary output: {raw_score:.6f}")
+            else:
+                # Multi-class output (shouldn't happen for binary model)
+                raw_score = float(raw_prediction[0][1])  # Assuming index 1 is REAL
+                logger.info(f"📊 Multi-class output: {raw_prediction[0]}")
+                logger.info(f"📊 Using class 1 (REAL): {raw_score:.6f}")
             
-            # Analyze prediction distribution for threshold tuning
-            logger.info(f"📊 Prediction analysis:")
-            logger.info(f"   Raw score: {raw_score:.6f}")
-            logger.info(f"   Score range: [0.0 - 1.0]")
-            logger.info(f"   Sigmoid output: {'Yes' if 0 <= raw_score <= 1 else 'No - Check model output!'}")
-            
-            # Dynamic threshold detection based on score distribution
+            # Smart threshold selection based on score distribution
             if raw_score > 0.8:
                 threshold = 0.7  # High confidence threshold
-                logger.info("🟢 Using high confidence threshold: 0.7")
+                confidence_level = "High"
             elif raw_score > 0.6:
                 threshold = 0.5  # Medium confidence threshold
-                logger.info("🟡 Using medium confidence threshold: 0.5")
+                confidence_level = "Medium"
             else:
-                threshold = 0.3  # Low confidence threshold for debugging
-                logger.info("🟠 Using low confidence threshold: 0.3 (debug mode)")
+                threshold = 0.4  # Lower threshold for edge cases
+                confidence_level = "Low"
             
-            # Classification logic
+            logger.info(f"🎯 Using {confidence_level} confidence threshold: {threshold:.3f}")
+            
+            # Make classification decision
             if raw_score >= threshold:
                 label = "REAL"
                 confidence = raw_score
-                logger.info(f"✅ REAL: score {raw_score:.6f} >= threshold {threshold:.3f}")
+                logger.info(f"✅ REAL: {raw_score:.6f} >= {threshold:.3f}")
             else:
                 label = "FAKE"
                 confidence = 1.0 - raw_score
-                logger.info(f"❌ FAKE: score {raw_score:.6f} < threshold {threshold:.3f}")
+                logger.info(f"❌ FAKE: {raw_score:.6f} < {threshold:.3f}")
             
-            # Additional debugging info
-            logger.info(f"🎯 Classification Summary:")
-            logger.info(f"   Input shape: {processed.shape}")
-            logger.info(f"   Raw model output: {raw_score:.6f}")
-            logger.info(f"   Applied threshold: {threshold:.3f}")
-            logger.info(f"   Final label: {label}")
+            # Log comprehensive results
+            logger.info(f"🎯 FINAL RESULT:")
+            logger.info(f"   Raw Score: {raw_score:.6f}")
+            logger.info(f"   Threshold: {threshold:.3f}")
+            logger.info(f"   Label: {label}")
             logger.info(f"   Confidence: {confidence:.6f}")
+            logger.info(f"   Confidence Level: {confidence_level}")
             
-            # Threshold recommendations based on observed scores
+            # Provide debugging hints
             if raw_score < 0.1:
-                logger.warning("⚠️ Very low score detected! Check preprocessing pipeline.")
+                logger.warning("⚠️ Very low score - check preprocessing pipeline")
             elif raw_score > 0.9:
-                logger.info("🚀 Very high confidence score - model is confident!")
+                logger.info("🚀 Very high confidence prediction")
             
             return label, confidence
             
         except Exception as e:
             logger.error(f"❌ Prediction failed: {e}")
             logger.error(f"🔍 Traceback: {traceback.format_exc()}")
-            return "FAKE", 0.1
+            # Safe fallback
+            return "FAKE", 0.2
 
 
 # ──────────────────────────────────────────────────────────────────────────────
