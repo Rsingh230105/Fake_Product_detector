@@ -350,26 +350,33 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form submission
     document.getElementById('uploadForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        const formData = new FormData();
-        formData.append('brand_name', document.getElementById('brandName').value);
 
+        const brandName = document.getElementById('brandName').value.trim();
+        if (!brandName) {
+            alert('⚠️ Please enter a brand name.');
+            return;
+        }
+
+        // Collect only file inputs that actually have a file selected
         const fileInputs = document.querySelectorAll('input[type="file"]');
-        const viewTypes  = document.querySelectorAll('input[name="view_types[]"]');
+        const formData   = new FormData();
+        formData.append('brand_name', brandName);
+
         let imageCount = 0;
-        fileInputs.forEach((input, i) => {
+        fileInputs.forEach(input => {
             if (input.files.length > 0) {
                 formData.append('images[]', input.files[0]);
-                formData.append('view_types[]', viewTypes[i].value);
+                formData.append('view_types[]', input.dataset.view); // use data-view, not hidden input
                 imageCount++;
             }
         });
 
         if (imageCount < 2) {
-            alert('⚠️ Please upload at least Front and Back view images');
+            alert('⚠️ Please upload at least Front and Back view images.');
             return;
         }
 
-        const submitBtn = document.getElementById('submitBtn');
+        const submitBtn  = document.getElementById('submitBtn');
         const originalHTML = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Analyzing Product...';
@@ -380,16 +387,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData,
                 headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
             });
+
             const result = await response.json();
 
             if (response.ok) {
                 submitBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Analysis Complete!';
-                submitBtn.className = submitBtn.className.replace('from-blue-600 to-purple-600', 'from-green-500 to-green-600');
+                submitBtn.classList.remove('from-blue-600', 'to-purple-600');
+                submitBtn.classList.add('from-green-500', 'to-green-600');
                 setTimeout(() => {
-                    window.location.href = result.redirect === 'admin' ? result.admin_url : `/result/${result.id}/`;
-                }, 1500);
+                    window.location.href = result.redirect === 'admin'
+                        ? result.admin_url
+                        : `/result/${result.id}/`;
+                }, 1200);
             } else {
-                throw new Error(result.error || 'Upload failed');
+                throw new Error(result.error || 'Upload failed. Please try again.');
             }
         } catch (error) {
             alert('❌ ' + error.message);
