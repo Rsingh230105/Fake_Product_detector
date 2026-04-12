@@ -295,26 +295,29 @@
 
 {% block extra_js %}
 <script>
-// Image Upload Handler
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.image-upload-section').forEach(section => {
-        const dropZone    = section.querySelector('.drop-zone');
-        const fileInput   = section.querySelector('input[type="file"]');
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ── 1. Drop-zone / preview / remove for each upload slot ──────────────────
+    document.querySelectorAll('.image-upload-section').forEach(function (section) {
+        const dropZone        = section.querySelector('.drop-zone');
+        const fileInput       = section.querySelector('input[type="file"]');
         const uploadContent   = section.querySelector('.upload-content');
         const previewContainer = section.querySelector('.preview-container');
-        const previewImage = section.querySelector('.preview-image');
-        const removeBtn   = section.querySelector('.remove-image');
+        const previewImage    = section.querySelector('.preview-image');
+        const removeBtn       = section.querySelector('.remove-image');
 
-        section.querySelector('.browse-btn').addEventListener('click', e => {
+        // Browse button opens file picker
+        section.querySelector('.browse-btn').addEventListener('click', function (e) {
             e.stopPropagation();
             fileInput.click();
         });
 
-        fileInput.addEventListener('change', function() {
+        // Show preview when a file is chosen
+        fileInput.addEventListener('change', function () {
             const file = this.files[0];
             if (!file || !file.type.startsWith('image/')) return;
             const reader = new FileReader();
-            reader.onload = e => {
+            reader.onload = function (e) {
                 previewImage.src = e.target.result;
                 uploadContent.classList.add('hidden');
                 previewContainer.classList.remove('hidden');
@@ -323,7 +326,8 @@ document.addEventListener('DOMContentLoaded', function() {
             reader.readAsDataURL(file);
         });
 
-        removeBtn.addEventListener('click', e => {
+        // Remove selected image
+        removeBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             fileInput.value = '';
             previewImage.src = '';
@@ -332,9 +336,10 @@ document.addEventListener('DOMContentLoaded', function() {
             dropZone.classList.remove('uploaded');
         });
 
-        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', e => {
+        // Drag-and-drop support
+        dropZone.addEventListener('dragover',  function (e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', function ()  { dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', function (e) {
             e.preventDefault();
             dropZone.classList.remove('dragover');
             const file = e.dataTransfer.files[0];
@@ -347,75 +352,101 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Form submission
-    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    // ── 2. Form submission → POST /api/detect/ ────────────────────────────────
+    document.getElementById('uploadForm').addEventListener('submit', async function (e) {
         e.preventDefault();
 
+        // --- Validate brand name ---
         const brandName = document.getElementById('brandName').value.trim();
         if (!brandName) {
             alert('⚠️ Please enter a brand name.');
             return;
         }
 
-        // Collect only file inputs that actually have a file selected
-        const fileInputs = document.querySelectorAll('input[type="file"]');
-        const formData   = new FormData();
+        // --- Build FormData ---
+        // Only append file inputs that actually have a file selected.
+        // Use data-view on the <input type="file"> to get the view type,
+        // so images[] and view_types[] always have the same count.
+        const formData = new FormData();
         formData.append('brand_name', brandName);
 
         let imageCount = 0;
-        fileInputs.forEach(input => {
+        document.querySelectorAll('input[type="file"]').forEach(function (input) {
             if (input.files.length > 0) {
-                formData.append('images[]', input.files[0]);
-                formData.append('view_types[]', input.dataset.view); // use data-view, not hidden input
+                formData.append('images[]',     input.files[0]);   // file
+                formData.append('view_types[]', input.dataset.view); // 'front'|'back'|'side'|'barcode'
                 imageCount++;
             }
         });
 
         if (imageCount < 2) {
-            alert('⚠️ Please upload at least Front and Back view images.');
+            alert('⚠️ Please upload at least the Front and Back view images.');
             return;
         }
 
-        const submitBtn  = document.getElementById('submitBtn');
+        // --- UI: loading state ---
+        const submitBtn   = document.getElementById('submitBtn');
         const originalHTML = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Analyzing Product...';
 
+        // --- Send request ---
         try {
+            console.log('[detect] Sending', imageCount, 'images for brand:', brandName);
+
             const response = await fetch('/api/detect/', {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+                method:  'POST',
+                body:    formData,
+                // Do NOT set Content-Type manually — browser sets multipart boundary automatically.
+                // X-CSRFToken is required by Django for POST requests.
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
             });
 
+            // --- Parse response ---
             const result = await response.json();
+            console.log('[detect] Response status:', response.status, '| body:', result);
 
             if (response.ok) {
+                // Success (HTTP 201)
                 submitBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Analysis Complete!';
                 submitBtn.classList.remove('from-blue-600', 'to-purple-600');
                 submitBtn.classList.add('from-green-500', 'to-green-600');
-                setTimeout(() => {
-                    window.location.href = result.redirect === 'admin'
-                        ? result.admin_url
-                        : `/result/${result.id}/`;
-                }, 1200);
+
+                // Redirect: admin → admin report, user → simple result page
+                const redirectUrl = (result.redirect === 'admin')
+                    ? result.admin_url
+                    : '/result/' + result.id + '/';
+
+                console.log('[detect] Redirecting to:', redirectUrl);
+                setTimeout(function () { window.location.href = redirectUrl; }, 1200);
+
             } else {
-                throw new Error(result.error || 'Upload failed. Please try again.');
+                // API returned an error (4xx / 5xx)
+                throw new Error(result.error || 'Upload failed (HTTP ' + response.status + ')');
             }
-        } catch (error) {
-            alert('❌ ' + error.message);
-            submitBtn.disabled = false;
+
+        } catch (err) {
+            // Network error or thrown Error above
+            console.error('[detect] Error:', err);
+            alert('❌ ' + err.message);
+            submitBtn.disabled  = false;
             submitBtn.innerHTML = originalHTML;
         }
     });
-});
 
-// Advertisement modal
+}); // end DOMContentLoaded
+
+
+// ── 3. Advertisement modal ─────────────────────────────────────────────────────
 function openAdModal(fileUrl, title, description, contentType) {
     const videoExts = ['.mp4', '.avi', '.webm', '.mov'];
-    const isVideo = videoExts.some(ext => fileUrl.toLowerCase().endsWith(ext));
-    document.getElementById('adTitle').textContent = title;
+    const isVideo   = videoExts.some(function (ext) { return fileUrl.toLowerCase().endsWith(ext); });
+
+    document.getElementById('adTitle').textContent       = title;
     document.getElementById('adDescription').textContent = description;
+
     if (isVideo) {
         document.getElementById('adVideo').querySelector('source').src = fileUrl;
         document.getElementById('adVideo').load();
@@ -426,6 +457,7 @@ function openAdModal(fileUrl, title, description, contentType) {
         document.getElementById('adImageViewer').classList.remove('hidden');
         document.getElementById('adVideoViewer').classList.add('hidden');
     }
+
     document.getElementById('adModal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
@@ -436,6 +468,8 @@ function closeAdModal() {
     document.body.style.overflow = 'auto';
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAdModal(); });
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAdModal();
+});
 </script>
 {% endblock %}
