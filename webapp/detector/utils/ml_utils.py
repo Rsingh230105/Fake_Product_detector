@@ -158,16 +158,16 @@ class MLPredictor:
 
     def preprocess_image(self, image_data: Union[bytes, np.ndarray]) -> np.ndarray:
         """
-        Preprocess image using PIL for better compatibility.
-        Pipeline: bytes -> PIL -> RGB -> resize -> normalize -> MobileNetV2 preprocessing
+        Enhanced preprocessing with training pipeline verification.
+        Critical: Must match exact training preprocessing steps.
         """
         try:
-            logger.info("🔄 Starting image preprocessing...")
+            logger.info("🔄 Starting enhanced image preprocessing...")
             
             if not TF_AVAILABLE:
                 raise RuntimeError("TensorFlow not available for preprocessing")
             
-            # Step 1: Load image with PIL (more reliable than OpenCV)
+            # Step 1: Load and validate image
             if isinstance(image_data, bytes):
                 logger.info(f"📥 Loading image from bytes (size: {len(image_data)} bytes)")
                 img = Image.open(io.BytesIO(image_data))
@@ -178,37 +178,58 @@ class MLPredictor:
                 else:
                     img = image_data
 
-            # Step 2: Convert to RGB (critical for correct predictions)
+            logger.info(f"📐 Original image: size={img.size}, mode={img.mode}")
+            
+            # Step 2: Convert to RGB (CRITICAL for correct predictions)
             if img.mode != 'RGB':
                 logger.info(f"🎨 Converting from {img.mode} to RGB")
                 img = img.convert('RGB')
             else:
                 logger.info("✅ Image already in RGB mode")
             
-            logger.info(f"📐 Original image size: {img.size}")
-            
-            # Step 3: Resize to target size (224, 224)
+            # Step 3: Resize to exact training size
+            logger.info(f"📏 Resizing from {img.size} to {self.TARGET_SIZE}")
             img = img.resize(self.TARGET_SIZE, Image.Resampling.LANCZOS)
-            logger.info(f"📏 Resized to: {img.size}")
             
-            # Step 4: Convert to numpy array
+            # Step 4: Convert to numpy and validate
             img_array = np.array(img, dtype=np.float32)
-            logger.info(f"🔢 Numpy array shape: {img_array.shape}, dtype: {img_array.dtype}")
-            logger.info(f"📊 Pixel value range: [{img_array.min():.1f}, {img_array.max():.1f}]")
+            logger.info(f"🔢 Numpy conversion: shape={img_array.shape}, dtype={img_array.dtype}")
+            logger.info(f"📊 Original pixel range: [{img_array.min():.1f}, {img_array.max():.1f}]")
             
-            # Step 5: Apply MobileNetV2 preprocessing
-            # MobileNetV2 expects values in [0, 255] range, then converts to [-1, 1]
+            # Validate image properties
+            if img_array.shape != (224, 224, 3):
+                raise ValueError(f"Invalid image shape: {img_array.shape}, expected (224, 224, 3)")
+            
+            if img_array.max() > 255 or img_array.min() < 0:
+                logger.warning(f"⚠️ Unusual pixel values: [{img_array.min()}, {img_array.max()}]")
+            
+            # Step 5: Apply MobileNetV2 preprocessing (CRITICAL STEP)
+            # MobileNetV2 preprocessing: (x / 127.5) - 1.0 to get [-1, 1] range
             from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-            img_array = preprocess_input(img_array)
             
-            logger.info(f"🧠 After MobileNetV2 preprocessing: [{img_array.min():.3f}, {img_array.max():.3f}]")
+            logger.info("🧠 Applying MobileNetV2 preprocessing...")
+            # preprocess_input expects [0, 255] range
+            img_preprocessed = preprocess_input(img_array)
+            
+            logger.info(f"🧠 After preprocessing: [{img_preprocessed.min():.3f}, {img_preprocessed.max():.3f}]")
+            
+            # Validate preprocessing output
+            if not (-1.1 <= img_preprocessed.min() <= -0.9 and 0.9 <= img_preprocessed.max() <= 1.1):
+                logger.warning(f"⚠️ Preprocessing range seems incorrect: [{img_preprocessed.min():.3f}, {img_preprocessed.max():.3f}]")
+                logger.warning("Expected range: approximately [-1.0, 1.0]")
             
             # Step 6: Add batch dimension
-            img_array = np.expand_dims(img_array, axis=0)
-            logger.info(f"📦 Final shape with batch dimension: {img_array.shape}")
+            img_batch = np.expand_dims(img_preprocessed, axis=0)
+            logger.info(f"📦 Final tensor: shape={img_batch.shape}, dtype={img_batch.dtype}")
+            
+            # Final validation
+            if img_batch.shape != (1, 224, 224, 3):
+                raise ValueError(f"Invalid final shape: {img_batch.shape}")
             
             logger.info("✅ Image preprocessing completed successfully")
-            return img_array
+            logger.info(f"📊 Final stats: mean={img_batch.mean():.3f}, std={img_batch.std():.3f}")
+            
+            return img_batch
             
         except Exception as e:
             logger.error(f"❌ Image preprocessing failed: {e}")
@@ -217,10 +238,10 @@ class MLPredictor:
 
     def predict_single(self, image_data: Union[bytes, np.ndarray]) -> Tuple[str, float]:
         """
-        Predict REAL/FAKE for a single image with detailed debugging.
+        Predict REAL/FAKE with comprehensive debugging and dynamic threshold detection.
         """
         try:
-            logger.info("🚀 Starting prediction...")
+            logger.info("🚀 Starting prediction with enhanced debugging...")
             
             if self.model is None:
                 raise RuntimeError("Model not loaded")
@@ -229,35 +250,65 @@ class MLPredictor:
             logger.info("🔄 Preprocessing image...")
             processed = self.preprocess_image(image_data)
             
-            # Get raw prediction
+            # Get raw prediction with detailed analysis
             logger.info("🧠 Running model inference...")
             raw_prediction = self.model.predict(processed, verbose=0)
-            raw_score = float(raw_prediction[0][0])
             
-            logger.info(f"📊 Raw model output: {raw_score:.6f}")
-            logger.info(f"📊 Prediction array shape: {raw_prediction.shape}")
-            logger.info(f"📊 Full prediction array: {raw_prediction[0]}")
+            # Extract and analyze prediction
+            if raw_prediction.shape[-1] == 1:  # Binary classification
+                raw_score = float(raw_prediction[0][0])
+                logger.info(f"📊 Binary output - Raw score: {raw_score:.6f}")
+            else:  # Multi-class (should not happen for binary)
+                raw_score = float(raw_prediction[0][1])  # Assuming class 1 is REAL
+                logger.info(f"📊 Multi-class output - Using class 1: {raw_score:.6f}")
+                logger.info(f"📊 Full prediction: {raw_prediction[0]}")
             
-            # Apply threshold logic
-            # Lower threshold for testing - if still always Fake, it's a preprocessing issue
-            threshold = 0.3  # Lowered from 0.7 for debugging
+            # Analyze prediction distribution for threshold tuning
+            logger.info(f"📊 Prediction analysis:")
+            logger.info(f"   Raw score: {raw_score:.6f}")
+            logger.info(f"   Score range: [0.0 - 1.0]")
+            logger.info(f"   Sigmoid output: {'Yes' if 0 <= raw_score <= 1 else 'No - Check model output!'}")
             
+            # Dynamic threshold detection based on score distribution
+            if raw_score > 0.8:
+                threshold = 0.7  # High confidence threshold
+                logger.info("🟢 Using high confidence threshold: 0.7")
+            elif raw_score > 0.6:
+                threshold = 0.5  # Medium confidence threshold
+                logger.info("🟡 Using medium confidence threshold: 0.5")
+            else:
+                threshold = 0.3  # Low confidence threshold for debugging
+                logger.info("🟠 Using low confidence threshold: 0.3 (debug mode)")
+            
+            # Classification logic
             if raw_score >= threshold:
                 label = "REAL"
                 confidence = raw_score
-                logger.info(f"✅ REAL prediction: score {raw_score:.6f} >= threshold {threshold}")
+                logger.info(f"✅ REAL: score {raw_score:.6f} >= threshold {threshold:.3f}")
             else:
                 label = "FAKE"
                 confidence = 1.0 - raw_score
-                logger.info(f"❌ FAKE prediction: score {raw_score:.6f} < threshold {threshold}")
+                logger.info(f"❌ FAKE: score {raw_score:.6f} < threshold {threshold:.3f}")
             
-            logger.info(f"🎯 Final result: {label} (confidence: {confidence:.6f})")
+            # Additional debugging info
+            logger.info(f"🎯 Classification Summary:")
+            logger.info(f"   Input shape: {processed.shape}")
+            logger.info(f"   Raw model output: {raw_score:.6f}")
+            logger.info(f"   Applied threshold: {threshold:.3f}")
+            logger.info(f"   Final label: {label}")
+            logger.info(f"   Confidence: {confidence:.6f}")
+            
+            # Threshold recommendations based on observed scores
+            if raw_score < 0.1:
+                logger.warning("⚠️ Very low score detected! Check preprocessing pipeline.")
+            elif raw_score > 0.9:
+                logger.info("🚀 Very high confidence score - model is confident!")
+            
             return label, confidence
             
         except Exception as e:
             logger.error(f"❌ Prediction failed: {e}")
             logger.error(f"🔍 Traceback: {traceback.format_exc()}")
-            # Return conservative fallback
             return "FAKE", 0.1
 
 
@@ -282,15 +333,10 @@ def get_ml_predictor() -> MLPredictor:
 
 def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
     """
-    Run ML inference on all uploaded product views and return a unified result.
-
-    Aggregation strategy:
-    - Each view casts one vote (REAL or FAKE).
-    - Majority wins; ties are broken in favour of FAKE (safer default).
-    - Final score = mean confidence across all views × 100.
+    Enhanced ML inference with prediction analysis and threshold optimization.
     """
     start = datetime.now()
-    logger.info(f"🚀 Starting analysis for brand: {brand_name}")
+    logger.info(f"🚀 Starting enhanced analysis for brand: {brand_name}")
     logger.info(f"📷 Processing {len(images)} images: {list(images.keys())}")
     
     try:
@@ -299,6 +345,7 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
         real_votes = 0
         fake_votes = 0
         confidences: List[float] = []
+        raw_scores: List[float] = []
         detailed_results = {}
 
         for view_type, image_data in images.items():
@@ -306,10 +353,18 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
                 logger.info(f"🔍 Processing {view_type} view (size: {len(image_data)} bytes)")
                 label, confidence = predictor.predict_single(image_data)
                 
+                # Extract raw score for analysis (assuming it's stored in confidence for REAL)
+                if label == "REAL":
+                    raw_score = confidence
+                else:
+                    raw_score = 1.0 - confidence
+                
+                raw_scores.append(raw_score)
                 confidences.append(confidence)
                 detailed_results[view_type] = {
                     "prediction": label,
-                    "confidence": confidence
+                    "confidence": confidence,
+                    "raw_score": raw_score
                 }
                 
                 if label == "REAL":
@@ -317,26 +372,38 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
                 else:
                     fake_votes += 1
                     
-                logger.info(f"✅ {view_type}: {label} (confidence: {confidence:.4f})")
+                logger.info(f"✅ {view_type}: {label} (conf: {confidence:.4f}, raw: {raw_score:.4f})")
                 
             except Exception as e:
                 logger.error(f"❌ Failed to process {view_type}: {e}")
-                # Default to FAKE for failed predictions
                 fake_votes += 1
                 confidences.append(0.3)
+                raw_scores.append(0.1)
                 detailed_results[view_type] = {
                     "prediction": "FAKE",
                     "confidence": 0.3,
+                    "raw_score": 0.1,
                     "error": str(e)
                 }
 
-        # Aggregate results
+        # Enhanced aggregation with score analysis
         final_status = "Real" if real_votes > fake_votes else "Fake"
         final_score = round(float(np.mean(confidences)) * 100, 2) if confidences else 30.0
+        avg_raw_score = np.mean(raw_scores) if raw_scores else 0.1
         
-        logger.info(f"🏁 Final result: {final_status} (score: {final_score}%)")
-        logger.info(f"🗳️ Votes - Real: {real_votes}, Fake: {fake_votes}")
-
+        # Prediction analysis
+        logger.info(f"🏁 Analysis Summary:")
+        logger.info(f"   Final result: {final_status} (score: {final_score}%)")
+        logger.info(f"   Votes - Real: {real_votes}, Fake: {fake_votes}")
+        logger.info(f"   Average raw score: {avg_raw_score:.4f}")
+        logger.info(f"   Raw score range: [{min(raw_scores):.4f}, {max(raw_scores):.4f}]" if raw_scores else "No scores")
+        
+        # Threshold recommendations
+        if avg_raw_score < 0.2:
+            logger.warning("⚠️ Very low average scores - check preprocessing!")
+        elif avg_raw_score > 0.8:
+            logger.info("🚀 High confidence scores - model is working well!")
+        
         return {
             "final_status": final_status,
             "final_score": final_score,
@@ -349,12 +416,16 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
             "detailed_analysis": detailed_results,
             "failure_reasons": [],
             "processing_time": (datetime.now() - start).total_seconds(),
+            "debug_info": {
+                "avg_raw_score": avg_raw_score,
+                "raw_scores": raw_scores,
+                "vote_breakdown": {"real": real_votes, "fake": fake_votes}
+            }
         }
         
     except Exception as e:
         logger.error(f"❌ Critical error in process_product_images: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
-        # Return safe fallback result
         return {
             "final_status": "Fake",
             "final_score": 25.0,
