@@ -133,52 +133,52 @@ class MLPredictor:
         if not TF_AVAILABLE:
             raise RuntimeError("TensorFlow is not available. Check installation.")
         
+        logger.info(f"Attempting to load model from: {self.model_path}")
+        logger.info(f"TensorFlow version: {tf.__version__}")
+        
+        errors = []
+        
+        # Method 1: Try loading with compile=False (safest for production)
         try:
-            logger.info(f"Attempting to load model from: {self.model_path}")
-            logger.info(f"TensorFlow version: {tf.__version__}")
-            
-            # Method 1: Try loading with compile=False (safest for production)
-            try:
-                self.model = keras.models.load_model(
-                    str(self.model_path),
-                    compile=False
-                )
-                logger.info("Model loaded successfully with compile=False")
-                return
-            except Exception as e1:
-                logger.warning(f"Method 1 failed (compile=False): {e1}")
-            
-            # Method 2: Try with custom_objects=None
-            try:
-                self.model = keras.models.load_model(
-                    str(self.model_path),
-                    custom_objects=None
-                )
-                logger.info("Model loaded successfully with custom_objects=None")
-                return
-            except Exception as e2:
-                logger.warning(f"Method 2 failed (custom_objects=None): {e2}")
-            
-            # Method 3: Try with tf.keras directly
-            try:
-                self.model = tf.keras.models.load_model(
-                    str(self.model_path),
-                    compile=False
-                )
-                logger.info("Model loaded successfully with tf.keras")
-                return
-            except Exception as e3:
-                logger.warning(f"Method 3 failed (tf.keras): {e3}")
-            
-            # If all methods fail, raise the most informative error
-            error_msg = f"All model loading methods failed. Errors: {e1}, {e2}, {e3}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-            
+            self.model = keras.models.load_model(
+                str(self.model_path),
+                compile=False
+            )
+            logger.info("Model loaded successfully with compile=False")
+            return
         except Exception as e:
-            logger.error(f"Critical model loading error: {e}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            raise RuntimeError(f"Model loading failed: {e}")
+            errors.append(f"Method 1 (compile=False): {e}")
+            logger.warning(f"Method 1 failed: {e}")
+        
+        # Method 2: Try with custom_objects=None
+        try:
+            self.model = keras.models.load_model(
+                str(self.model_path),
+                custom_objects=None
+            )
+            logger.info("Model loaded successfully with custom_objects=None")
+            return
+        except Exception as e:
+            errors.append(f"Method 2 (custom_objects=None): {e}")
+            logger.warning(f"Method 2 failed: {e}")
+        
+        # Method 3: Try with tf.keras directly
+        try:
+            self.model = tf.keras.models.load_model(
+                str(self.model_path),
+                compile=False
+            )
+            logger.info("Model loaded successfully with tf.keras")
+            return
+        except Exception as e:
+            errors.append(f"Method 3 (tf.keras): {e}")
+            logger.warning(f"Method 3 failed: {e}")
+        
+        # All methods failed
+        error_msg = f"All model loading methods failed. Errors: {'; '.join(errors)}"
+        logger.error(error_msg)
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise RuntimeError(error_msg)
 
     def preprocess_image(self, image_data: Union[bytes, np.ndarray]) -> np.ndarray:
         """
