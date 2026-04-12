@@ -14,8 +14,8 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load .env from the webapp/ directory (where manage.py and gunicorn run from)
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,6 +29,7 @@ if not SECRET_KEY:
 DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
 
 
 # Application definition
@@ -63,10 +64,11 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# CORS settings — add your React frontend URL here
+# CORS — same-origin Django templates don't need CORS, but kept for any
+# external API consumers. Set CORS_ALLOWED_ORIGINS in your .env.
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://127.0.0.1:3000'
+    'http://localhost:8000'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
@@ -231,9 +233,11 @@ ML_MODEL_PATH = os.getenv(
     str(BASE_DIR.parent / 'models' / 'mobilenet_v2_food_production.keras')
 )
 
-# Tesseract OCR — override via env var for cross-platform support
-TESSERACT_CMD = os.getenv('TESSERACT_CMD', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
-TESSDATA_PREFIX = os.getenv('TESSDATA_PREFIX', r'C:\Program Files\Tesseract-OCR\tessdata')
+# Tesseract OCR
+# Linux (Render): /usr/bin/tesseract  — installed via apt in build.sh
+# Windows (local): C:\Program Files\Tesseract-OCR\tesseract.exe
+TESSERACT_CMD = os.getenv('TESSERACT_CMD', '/usr/bin/tesseract')
+TESSDATA_PREFIX = os.getenv('TESSDATA_PREFIX', '/usr/share/tesseract-ocr/4.00/tessdata')
 
 # Logging — console only on Render (no writable filesystem for log files)
 LOGGING = {

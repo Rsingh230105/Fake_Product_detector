@@ -28,6 +28,7 @@ local_settings.py
 .env
 .env.local
 .env.*.local
+webapp/.env
 
 # ML Models & Datasets
 models/
@@ -99,9 +100,12 @@ QUICK_START_TRAINING.md
 TRAINING_SUMMARY.txt
 model_pipeline/TRAINING_GUIDE.md
 
-# Local scripts
+# Local scripts & generated files
 run_server.bat
 PUSH_TO_GITHUB.bat
+deploy.bat
+health_check.py
+train_model.bat
 
 # Large media files
 *.mp4

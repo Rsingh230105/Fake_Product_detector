@@ -1,29 +1,23 @@
 #!/usr/bin/env bash
-# build.sh - Production build script for Render deployment
+# build.sh — Render build script
+set -o errexit
 
-set -o errexit  # Exit on any error
+echo "==> Installing system dependencies..."
+apt-get install -y tesseract-ocr libzbar0 2>/dev/null || true
 
-echo "🚀 Starting build process..."
-
-# Update pip to latest version
-echo "📦 Updating pip..."
+echo "==> Upgrading pip..."
 pip install --upgrade pip
 
-# Install Python dependencies
-echo "📦 Installing dependencies..."
+echo "==> Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Create models directory for ML model storage
-echo "📁 Creating models directory..."
+echo "==> Creating models directory..."
 mkdir -p models
 
-# Collect static files for Django
-echo "🎨 Collecting static files..."
+echo "==> Collecting static files..."
 python webapp/manage.py collectstatic --no-input
 
-# Run database migrations
-echo "🗄️ Running database migrations..."
+echo "==> Running migrations..."
 python webapp/manage.py migrate --no-input
 
-echo "✅ Build completed successfully!"
-echo "🎯 Ready for deployment on Render"
+echo "==> Build complete."
