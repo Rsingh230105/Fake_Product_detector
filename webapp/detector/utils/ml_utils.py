@@ -36,27 +36,17 @@ logger = logging.getLogger(__name__)
 def ensure_model_exists(model_path: Path) -> None:
     """
     Check if the model file exists locally.
-    If not, download it from the URL defined in ML_MODEL_URL (settings/env).
-
-    Raises:
-        RuntimeError: if ML_MODEL_URL is not set and model is missing.
-        RuntimeError: if download fails.
+    If not, download it from Google Drive using the provided URL.
     """
-    if model_path.exists():
-        logger.info(f"[MODEL] Found at {model_path}")
+    if model_path.exists() and model_path.stat().st_size > 1000000:  # Check file size > 1MB
+        logger.info(f"[MODEL] Found at {model_path} (Size: {model_path.stat().st_size / 1e6:.1f} MB)")
         return
 
-    # Model not found — attempt download
-    from django.conf import settings  # imported here to avoid circular import
-
-    url = getattr(settings, "ML_MODEL_URL", None)
-    if not url:
-        raise RuntimeError(
-            f"Model not found at '{model_path}' and ML_MODEL_URL is not set. "
-            "Set ML_MODEL_URL in your .env file to enable auto-download."
-        )
-
-    logger.info(f"[MODEL] Not found locally. Downloading from Google Drive...")
+    # Model not found or corrupted — download from Google Drive
+    google_drive_url = "https://drive.google.com/uc?id=1YO43M94sUYcs8A-S3MEt6wS9x4gJ8S_Y"
+    
+    logger.info(f"[MODEL] Downloading from Google Drive...")
+    logger.info(f"[MODEL] URL: {google_drive_url}")
     logger.info(f"[MODEL] Destination: {model_path}")
 
     try:
@@ -71,20 +61,20 @@ def ensure_model_exists(model_path: Path) -> None:
     model_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        gdown.download(url, str(model_path), quiet=False, fuzzy=True)
+        # Download with gdown
+        gdown.download(google_drive_url, str(model_path), quiet=False)
+        
+        # Verify download
+        if not model_path.exists() or model_path.stat().st_size < 1000000:
+            raise RuntimeError("Downloaded file is missing or too small (corrupted)")
+            
+        logger.info(f"[MODEL] Download complete. Size: {model_path.stat().st_size / 1e6:.1f} MB")
+        
     except Exception as e:
         # Clean up partial download
         if model_path.exists():
             model_path.unlink()
         raise RuntimeError(f"Model download failed: {e}")
-
-    if not model_path.exists():
-        raise RuntimeError(
-            "Download appeared to succeed but model file was not created. "
-            "Check that the Google Drive link is publicly accessible."
-        )
-
-    logger.info(f"[MODEL] Download complete. Size: {model_path.stat().st_size / 1e6:.1f} MB")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -135,63 +125,38 @@ class MLPredictor:
         
         logger.info(f"Attempting to load model from: {self.model_path}")
         logger.info(f"TensorFlow version: {tf.__version__}")
+        logger.info(f"Model file size: {self.model_path.stat().st_size / 1e6:.1f} MB")
         
-        errors = []
-        
-        # Method 1: Try loading with compile=False (safest for production)
         try:
-            self.model = keras.models.load_model(
-                str(self.model_path),
-                compile=False
-            )
-            logger.info("Model loaded successfully with compile=False")
-            return
+            # Load model with compile=False for production safety
+            from tensorflow.keras.models import load_model
+            self.model = load_model(str(self.model_path), compile=False)
+            logger.info("✅ Model loaded successfully with compile=False")
+            
+            # Log model architecture info
+            logger.info(f"Model input shape: {self.model.input_shape}")
+            logger.info(f"Model output shape: {self.model.output_shape}")
+            
         except Exception as e:
-            errors.append(f"Method 1 (compile=False): {e}")
-            logger.warning(f"Method 1 failed: {e}")
-        
-        # Method 2: Try with custom_objects=None
-        try:
-            self.model = keras.models.load_model(
-                str(self.model_path),
-                custom_objects=None
-            )
-            logger.info("Model loaded successfully with custom_objects=None")
-            return
-        except Exception as e:
-            errors.append(f"Method 2 (custom_objects=None): {e}")
-            logger.warning(f"Method 2 failed: {e}")
-        
-        # Method 3: Try with tf.keras directly
-        try:
-            self.model = tf.keras.models.load_model(
-                str(self.model_path),
-                compile=False
-            )
-            logger.info("Model loaded successfully with tf.keras")
-            return
-        except Exception as e:
-            errors.append(f"Method 3 (tf.keras): {e}")
-            logger.warning(f"Method 3 failed: {e}")
-        
-        # All methods failed
-        error_msg = f"All model loading methods failed. Errors: {'; '.join(errors)}"
-        logger.error(error_msg)
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise RuntimeError(error_msg)
+            logger.error(f"❌ Model loading failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise RuntimeError(f"Model loading failed: {e}")
 
     def preprocess_image(self, image_data: Union[bytes, np.ndarray]) -> np.ndarray:
         """
-        Preprocess image exactly as during training:
-        BGR→RGB, resize to 224×224, mobilenet_v2.preprocess_input.
+        Preprocess image to match training pipeline exactly:
+        1. Decode image from bytes
+        2. Convert BGR to RGB
+        3. Resize to (224, 224)
+        4. Convert to float32 and normalize to [0, 1]
+        5. Apply MobileNetV2 preprocessing ([-1, 1] range)
+        6. Add batch dimension
         """
         try:
-            # Import with error handling
             if not TF_AVAILABLE:
                 raise RuntimeError("TensorFlow not available for preprocessing")
             
-            from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-
+            # Step 1: Decode image
             if isinstance(image_data, bytes):
                 arr = np.frombuffer(image_data, np.uint8)
                 img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -201,46 +166,75 @@ class MLPredictor:
             if img is None:
                 raise ValueError("Failed to decode image")
 
+            # Step 2: Convert BGR to RGB (critical for correct predictions)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = cv2.resize(img, self.TARGET_SIZE)
-            img = img.astype(np.float32)
-            img = preprocess_input(img)
-            return np.expand_dims(img, axis=0)
+            
+            # Step 3: Resize to target size
+            img = cv2.resize(img, self.TARGET_SIZE, interpolation=cv2.INTER_AREA)
+            
+            # Step 4: Convert to float32 and normalize to [0, 1]
+            img = img.astype(np.float32) / 255.0
+            
+            # Step 5: Apply MobileNetV2 preprocessing (converts [0,1] to [-1,1])
+            from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+            img = preprocess_input(img * 255.0)  # preprocess_input expects [0,255]
+            
+            # Step 6: Add batch dimension
+            img = np.expand_dims(img, axis=0)
+            
+            logger.debug(f"Preprocessed image shape: {img.shape}, dtype: {img.dtype}, range: [{img.min():.3f}, {img.max():.3f}]")
+            return img
+            
         except Exception as e:
             logger.error(f"Image preprocessing failed: {e}")
             raise RuntimeError(f"Image preprocessing failed: {e}")
 
     def predict_single(self, image_data: Union[bytes, np.ndarray]) -> Tuple[str, float]:
         """
-        Predict REAL/FAKE for a single image using the optimal threshold.
-
+        Predict REAL/FAKE for a single image.
+        
+        Model output interpretation:
+        - Raw score close to 1.0 = REAL product
+        - Raw score close to 0.0 = FAKE product
+        - Threshold: 0.7 (adjusted for better accuracy)
+        
         Returns:
-            (label, confidence) where confidence is the probability of the
-            predicted class (always in [0, 1]).
+            (label, confidence) where confidence is the probability of the predicted class
         """
         try:
             if self.model is None:
                 raise RuntimeError("Model not loaded")
             
+            # Preprocess image
             processed = self.preprocess_image(image_data)
+            
+            # Get prediction
             raw_score = float(self.model.predict(processed, verbose=0)[0][0])
-
-            if raw_score >= self.threshold:
+            
+            # Use adjusted threshold for better accuracy
+            threshold = 0.7  # Higher threshold for more conservative REAL predictions
+            
+            # Determine label and confidence
+            if raw_score >= threshold:
                 label = "REAL"
                 confidence = raw_score
             else:
                 label = "FAKE"
                 confidence = 1.0 - raw_score
-
-            logger.debug(
-                f"raw={raw_score:.4f} threshold={self.threshold:.4f} "
-                f"→ {label} (conf={confidence:.4f})"
+            
+            # Log prediction details
+            logger.info(
+                f"🔍 Prediction: raw_score={raw_score:.4f}, threshold={threshold:.4f} "
+                f"→ {label} (confidence={confidence:.4f})"
             )
+            
             return label, confidence
+            
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
-            # Return fallback prediction
-            return "FAKE", 0.5
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Return conservative fallback
+            return "FAKE", 0.3
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -272,6 +266,8 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
     - Final score = mean confidence across all views × 100.
     """
     start = datetime.now()
+    logger.info(f"🚀 Starting analysis for brand: {brand_name}")
+    logger.info(f"📷 Processing {len(images)} images: {list(images.keys())}")
     
     try:
         predictor = get_ml_predictor()
@@ -279,24 +275,43 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
         real_votes = 0
         fake_votes = 0
         confidences: List[float] = []
+        detailed_results = {}
 
         for view_type, image_data in images.items():
             try:
+                logger.info(f"🔍 Processing {view_type} view (size: {len(image_data)} bytes)")
                 label, confidence = predictor.predict_single(image_data)
+                
                 confidences.append(confidence)
+                detailed_results[view_type] = {
+                    "prediction": label,
+                    "confidence": confidence
+                }
+                
                 if label == "REAL":
                     real_votes += 1
                 else:
                     fake_votes += 1
+                    
+                logger.info(f"✅ {view_type}: {label} (confidence: {confidence:.4f})")
+                
             except Exception as e:
-                logger.error(f"Failed to process {view_type}: {e}")
+                logger.error(f"❌ Failed to process {view_type}: {e}")
                 # Default to FAKE for failed predictions
                 fake_votes += 1
                 confidences.append(0.3)
+                detailed_results[view_type] = {
+                    "prediction": "FAKE",
+                    "confidence": 0.3,
+                    "error": str(e)
+                }
 
-        # Ties go to FAKE — safer for a counterfeit-detection system
+        # Aggregate results
         final_status = "Real" if real_votes > fake_votes else "Fake"
         final_score = round(float(np.mean(confidences)) * 100, 2) if confidences else 30.0
+        
+        logger.info(f"🏁 Final result: {final_status} (score: {final_score}%)")
+        logger.info(f"🗳️ Votes - Real: {real_votes}, Fake: {fake_votes}")
 
         return {
             "final_status": final_status,
@@ -307,12 +322,13 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
                 "ocr_score": 0,
                 "packaging_score": final_score,
             },
-            "detailed_analysis": {},
+            "detailed_analysis": detailed_results,
             "failure_reasons": [],
             "processing_time": (datetime.now() - start).total_seconds(),
         }
+        
     except Exception as e:
-        logger.error(f"Critical error in process_product_images: {e}")
+        logger.error(f"❌ Critical error in process_product_images: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         # Return safe fallback result
         return {
