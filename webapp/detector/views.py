@@ -660,8 +660,8 @@ class FoodDetectorView(APIView):
                 user_report = "Analysis temporarily unavailable. Product marked as potentially fake for safety."
             
             # Update product with detailed analysis results
-            product.final_prediction = analysis_result['final_status']
-            product.overall_confidence = analysis_result['final_score'] / 100  # Convert to 0-1 scale
+            product.final_prediction = analysis_result['final_status']  # Real | Fake | Uncertain
+            product.overall_confidence = analysis_result['final_score'] / 100
             product.processing_time = analysis_result['processing_time']
             
             # Save component scores
@@ -676,10 +676,11 @@ class FoodDetectorView(APIView):
             product.failure_reasons = analysis_result['failure_reasons']
             product.user_report = user_report  # Store user-friendly report
             
-            # Set risk level based on final score
-            if analysis_result['final_score'] >= 70:
+            # Set risk level based on final status
+            status_label = analysis_result.get('status_label', 'FAKE')
+            if status_label == 'REAL':
                 product.risk_level = 'low'
-            elif analysis_result['final_score'] >= 40:
+            elif status_label == 'UNCERTAIN':
                 product.risk_level = 'medium'
             else:
                 product.risk_level = 'high'
@@ -703,7 +704,8 @@ class FoodDetectorView(APIView):
                 response_data = {
                     'id': product.id,
                     'brand_name': product.brand_name,
-                    'status': 'REAL' if product.final_prediction == 'Real' else 'FAKE'
+                    'status': analysis_result.get('status_label', 'FAKE'),  # REAL | FAKE | UNCERTAIN
+                    'score': analysis_result['final_score'],
                 }
 
             return Response(response_data, status=status.HTTP_201_CREATED)

@@ -390,76 +390,31 @@ class MLPredictor:
 
     def predict_single(self, image_data: Union[bytes, np.ndarray]) -> Tuple[str, float]:
         """
-        Production-optimized prediction with smart threshold adjustment.
+        Returns raw model score only. Final label is decided in process_product_images
+        using the average across all views.
         """
         try:
-            logger.info("🚀 Starting prediction...")
-            
             if self.model is None:
                 raise RuntimeError("Model not loaded")
-            
-            # Preprocess image
+
             processed = self.preprocess_image(image_data)
-            
-            # Get model prediction
+
             logger.info("🧠 Running model inference...")
             raw_prediction = self.model.predict(processed, verbose=0)
-            
-            # Handle different output formats
+
+            # Binary output: single sigmoid score in [0, 1]
             if raw_prediction.shape[-1] == 1:
-                # Binary classification output
                 raw_score = float(raw_prediction[0][0])
-                logger.info(f"📊 Binary output: {raw_score:.6f}")
             else:
-                # Multi-class output (shouldn't happen for binary model)
-                raw_score = float(raw_prediction[0][1])  # Assuming index 1 is REAL
-                logger.info(f"📊 Multi-class output: {raw_prediction[0]}")
-                logger.info(f"📊 Using class 1 (REAL): {raw_score:.6f}")
-            
-            # Smart threshold selection based on score distribution
-            if raw_score > 0.8:
-                threshold = 0.7  # High confidence threshold
-                confidence_level = "High"
-            elif raw_score > 0.6:
-                threshold = 0.5  # Medium confidence threshold
-                confidence_level = "Medium"
-            else:
-                threshold = 0.4  # Lower threshold for edge cases
-                confidence_level = "Low"
-            
-            logger.info(f"🎯 Using {confidence_level} confidence threshold: {threshold:.3f}")
-            
-            # Make classification decision
-            if raw_score >= threshold:
-                label = "REAL"
-                confidence = raw_score
-                logger.info(f"✅ REAL: {raw_score:.6f} >= {threshold:.3f}")
-            else:
-                label = "FAKE"
-                confidence = 1.0 - raw_score
-                logger.info(f"❌ FAKE: {raw_score:.6f} < {threshold:.3f}")
-            
-            # Log comprehensive results
-            logger.info(f"🎯 FINAL RESULT:")
-            logger.info(f"   Raw Score: {raw_score:.6f}")
-            logger.info(f"   Threshold: {threshold:.3f}")
-            logger.info(f"   Label: {label}")
-            logger.info(f"   Confidence: {confidence:.6f}")
-            logger.info(f"   Confidence Level: {confidence_level}")
-            
-            # Provide debugging hints
-            if raw_score < 0.1:
-                logger.warning("⚠️ Very low score - check preprocessing pipeline")
-            elif raw_score > 0.9:
-                logger.info("🚀 Very high confidence prediction")
-            
-            return label, confidence
-            
+                raw_score = float(raw_prediction[0][1])  # class-1 probability
+
+            logger.info(f"📊 Raw score: {raw_score:.6f}")
+            return raw_score
+
         except Exception as e:
             logger.error(f"❌ Prediction failed: {e}")
             logger.error(f"🔍 Traceback: {traceback.format_exc()}")
-            # Safe fallback
-            return "FAKE", 0.2
+            return None  # caller handles None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -481,82 +436,73 @@ def get_ml_predictor() -> MLPredictor:
 # MAIN PIPELINE FUNCTION
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _classify(avg_score: float) -> Tuple[str, str]:
+    """
+    3-level classification based on average raw score across all views.
+
+    Thresholds:
+        >= 0.7  → REAL      (high confidence genuine)
+        <  0.4  → FAKE      (high confidence counterfeit)
+        else    → UNCERTAIN (model is not confident)
+    """
+    if avg_score >= 0.7:
+        return "Real", "REAL"
+    elif avg_score < 0.4:
+        return "Fake", "FAKE"
+    else:
+        return "Uncertain", "UNCERTAIN"
+
+
 def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
     """
     Enhanced ML inference with prediction analysis and threshold optimization.
     """
     start = datetime.now()
-    logger.info(f"🚀 Starting enhanced analysis for brand: {brand_name}")
+    logger.info(f"🚀 Starting analysis for brand: {brand_name}")
     logger.info(f"📷 Processing {len(images)} images: {list(images.keys())}")
-    
+
     try:
         predictor = get_ml_predictor()
 
-        real_votes = 0
-        fake_votes = 0
-        confidences: List[float] = []
         raw_scores: List[float] = []
         detailed_results = {}
 
         for view_type, image_data in images.items():
             try:
-                logger.info(f"🔍 Processing {view_type} view (size: {len(image_data)} bytes)")
-                label, confidence = predictor.predict_single(image_data)
-                
-                # Extract raw score for analysis (assuming it's stored in confidence for REAL)
-                if label == "REAL":
-                    raw_score = confidence
-                else:
-                    raw_score = 1.0 - confidence
-                
+                logger.info(f"🔍 Processing {view_type} ({len(image_data)} bytes)")
+                raw_score = predictor.predict_single(image_data)
+
+                if raw_score is None:
+                    logger.warning(f"⚠️ {view_type}: prediction returned None, skipping")
+                    detailed_results[view_type] = {"raw_score": None, "skipped": True}
+                    continue
+
                 raw_scores.append(raw_score)
-                confidences.append(confidence)
-                detailed_results[view_type] = {
-                    "prediction": label,
-                    "confidence": confidence,
-                    "raw_score": raw_score
-                }
-                
-                if label == "REAL":
-                    real_votes += 1
-                else:
-                    fake_votes += 1
-                    
-                logger.info(f"✅ {view_type}: {label} (conf: {confidence:.4f}, raw: {raw_score:.4f})")
-                
+                detailed_results[view_type] = {"raw_score": round(raw_score, 6)}
+                logger.info(f"✅ {view_type}: raw_score={raw_score:.6f}")
+
             except Exception as e:
                 logger.error(f"❌ Failed to process {view_type}: {e}")
-                fake_votes += 1
-                confidences.append(0.3)
-                raw_scores.append(0.1)
-                detailed_results[view_type] = {
-                    "prediction": "FAKE",
-                    "confidence": 0.3,
-                    "raw_score": 0.1,
-                    "error": str(e)
-                }
+                detailed_results[view_type] = {"raw_score": None, "error": str(e)}
 
-        # Enhanced aggregation with score analysis
-        final_status = "Real" if real_votes > fake_votes else "Fake"
-        final_score = round(float(np.mean(confidences)) * 100, 2) if confidences else 30.0
-        avg_raw_score = np.mean(raw_scores) if raw_scores else 0.1
-        
-        # Prediction analysis
-        logger.info(f"🏁 Analysis Summary:")
-        logger.info(f"   Final result: {final_status} (score: {final_score}%)")
-        logger.info(f"   Votes - Real: {real_votes}, Fake: {fake_votes}")
-        logger.info(f"   Average raw score: {avg_raw_score:.4f}")
-        logger.info(f"   Raw score range: [{min(raw_scores):.4f}, {max(raw_scores):.4f}]" if raw_scores else "No scores")
-        
-        # Threshold recommendations
-        if avg_raw_score < 0.2:
-            logger.warning("⚠️ Very low average scores - check preprocessing!")
-        elif avg_raw_score > 0.8:
-            logger.info("🚀 High confidence scores - model is working well!")
-        
+        if not raw_scores:
+            raise RuntimeError("No valid predictions — all images failed")
+
+        # ── Final decision: average score across all views ──────────────────
+        avg_score = float(np.mean(raw_scores))
+        final_status, status_label = _classify(avg_score)
+        final_score = round(avg_score * 100, 2)
+
+        logger.info(f"🏁 Raw scores     : {[round(s, 4) for s in raw_scores]}")
+        logger.info(f"🏁 Average score  : {avg_score:.6f}")
+        logger.info(f"🏁 Final status   : {final_status} ({status_label})")
+        logger.info(f"🏁 Final score    : {final_score}%")
+
         return {
-            "final_status": final_status,
+            "final_status": final_status,       # 'Real' | 'Fake' | 'Uncertain'
+            "status_label": status_label,        # 'REAL' | 'FAKE' | 'UNCERTAIN'
             "final_score": final_score,
+            "avg_raw_score": avg_score,
             "component_scores": {
                 "barcode_score": 0,
                 "logo_score": 0,
@@ -566,19 +512,16 @@ def process_product_images(images: Dict[str, bytes], brand_name: str) -> Dict:
             "detailed_analysis": detailed_results,
             "failure_reasons": [],
             "processing_time": (datetime.now() - start).total_seconds(),
-            "debug_info": {
-                "avg_raw_score": avg_raw_score,
-                "raw_scores": raw_scores,
-                "vote_breakdown": {"real": real_votes, "fake": fake_votes}
-            }
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Critical error in process_product_images: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(traceback.format_exc())
         return {
             "final_status": "Fake",
+            "status_label": "FAKE",
             "final_score": 25.0,
+            "avg_raw_score": 0.25,
             "component_scores": {
                 "barcode_score": 0,
                 "logo_score": 0,
