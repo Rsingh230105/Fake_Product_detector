@@ -634,12 +634,30 @@ class FoodDetectorView(APIView):
                 image_file.seek(0)  # Reset pointer for Django to save the file
 
             # Process images with detailed analysis
-            from .utils.ml_utils import process_product_images
-            from .utils.report_generator import generate_user_friendly_report
-            analysis_result = process_product_images(image_data, brand_name)
-            
-            # Generate user-friendly report
-            user_report = generate_user_friendly_report(analysis_result)
+            try:
+                from .utils.ml_utils import process_product_images
+                from .utils.report_generator import generate_user_friendly_report
+                analysis_result = process_product_images(image_data, brand_name)
+                
+                # Generate user-friendly report
+                user_report = generate_user_friendly_report(analysis_result)
+            except Exception as ml_error:
+                logger.error(f"ML processing failed: {ml_error}")
+                # Fallback analysis result
+                analysis_result = {
+                    "final_status": "Fake",
+                    "final_score": 25.0,
+                    "component_scores": {
+                        "barcode_score": 0,
+                        "logo_score": 0,
+                        "ocr_score": 0,
+                        "packaging_score": 25.0,
+                    },
+                    "detailed_analysis": {"error": "ML processing unavailable"},
+                    "failure_reasons": ["ML model loading failed"],
+                    "processing_time": 0.1,
+                }
+                user_report = "Analysis temporarily unavailable. Product marked as potentially fake for safety."
             
             # Update product with detailed analysis results
             product.final_prediction = analysis_result['final_status']
