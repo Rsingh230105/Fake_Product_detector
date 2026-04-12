@@ -14,6 +14,7 @@ import sys
 import cv2
 import numpy as np
 import tensorflow as tf
+from tensorflow import keras
 
 logger = logging.getLogger(__name__)
 
@@ -118,28 +119,17 @@ class MLPredictor:
             logger.info("[THRESHOLD] Config not found. Using default 0.5")
 
     def _load_model(self) -> None:
-        """Load model with FocalLoss custom object support."""
-        custom_objects = {}
-        sys_path_backup = sys.path.copy()
+        """Load model with production-safe loading."""
         try:
-            model_pipeline_path = self.model_path.parent.parent / "model_pipeline"
-            if model_pipeline_path.exists():
-                sys.path.insert(0, str(model_pipeline_path))
-                from model import FocalLoss  # noqa: PLC0415
-                custom_objects = {"FocalLoss": FocalLoss}
-                logger.info("FocalLoss loaded from model_pipeline")
-            else:
-                logger.warning("model_pipeline not found — loading without FocalLoss")
-        except ImportError:
-            logger.warning("Could not import FocalLoss — loading without custom objects")
-        finally:
-            sys.path = sys_path_backup
-
-        self.model = tf.keras.models.load_model(
-            str(self.model_path),
-            custom_objects=custom_objects or None,
-        )
-        logger.info("ML model loaded successfully")
+            # Try loading with compile=False for production compatibility
+            self.model = keras.models.load_model(
+                str(self.model_path),
+                compile=False
+            )
+            logger.info("ML model loaded successfully (compile=False)")
+        except Exception as e:
+            logger.error(f"Failed to load model: {e}")
+            raise RuntimeError(f"Model loading failed: {e}")
 
     def preprocess_image(self, image_data: Union[bytes, np.ndarray]) -> np.ndarray:
         """

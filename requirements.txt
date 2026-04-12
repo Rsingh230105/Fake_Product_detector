@@ -9,9 +9,10 @@ phonenumbers==9.0.24
 gunicorn==21.2.0
 
 # ── ML / Deep Learning ────────────────────────────────────────────────────────
-# tensorflow 2.13.0: supports Python 3.10, stable on Render
-# numpy <2.0 required by TF 2.13
-tensorflow==2.13.0
+# tensorflow 2.15.0: better compatibility with .keras format
+# keras 2.15.0: matches tensorflow version
+tensorflow==2.15.0
+keras==2.15.0
 numpy==1.24.3
 
 # ── Image Processing ──────────────────────────────────────────────────────────
