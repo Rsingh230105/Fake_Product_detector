@@ -14,6 +14,8 @@ import traceback
 
 import cv2
 import numpy as np
+from PIL import Image
+import io
 
 # Import TensorFlow with error handling
 try:
@@ -123,118 +125,140 @@ class MLPredictor:
         if not TF_AVAILABLE:
             raise RuntimeError("TensorFlow is not available. Check installation.")
         
-        logger.info(f"Attempting to load model from: {self.model_path}")
-        logger.info(f"TensorFlow version: {tf.__version__}")
-        logger.info(f"Model file size: {self.model_path.stat().st_size / 1e6:.1f} MB")
+        logger.info(f"🚀 Attempting to load model from: {self.model_path}")
+        logger.info(f"🔍 TensorFlow version: {tf.__version__}")
+        
+        if self.model_path.exists():
+            logger.info(f"✅ Model file exists. Size: {self.model_path.stat().st_size / 1e6:.1f} MB")
+        else:
+            logger.error(f"❌ Model file not found at: {self.model_path}")
         
         try:
             # Load model with compile=False for production safety
             from tensorflow.keras.models import load_model
+            logger.info("🔄 Loading model with compile=False...")
             self.model = load_model(str(self.model_path), compile=False)
-            logger.info("✅ Model loaded successfully with compile=False")
+            logger.info("✅ Model loaded successfully!")
             
             # Log model architecture info
-            logger.info(f"Model input shape: {self.model.input_shape}")
-            logger.info(f"Model output shape: {self.model.output_shape}")
+            logger.info(f"🏢 Model input shape: {self.model.input_shape}")
+            logger.info(f"🏢 Model output shape: {self.model.output_shape}")
+            logger.info(f"🏢 Model layers: {len(self.model.layers)}")
+            
+            # Test model with dummy input
+            logger.info("🧪 Testing model with dummy input...")
+            dummy_input = np.random.random((1, 224, 224, 3)).astype(np.float32)
+            test_output = self.model.predict(dummy_input, verbose=0)
+            logger.info(f"✅ Dummy test successful. Output: {test_output[0][0]:.6f}")
             
         except Exception as e:
             logger.error(f"❌ Model loading failed: {e}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"🔍 Traceback: {traceback.format_exc()}")
             raise RuntimeError(f"Model loading failed: {e}")
 
     def preprocess_image(self, image_data: Union[bytes, np.ndarray]) -> np.ndarray:
         """
-        Preprocess image to match training pipeline exactly:
-        1. Decode image from bytes
-        2. Convert BGR to RGB
-        3. Resize to (224, 224)
-        4. Convert to float32 and normalize to [0, 1]
-        5. Apply MobileNetV2 preprocessing ([-1, 1] range)
-        6. Add batch dimension
+        Preprocess image using PIL for better compatibility.
+        Pipeline: bytes -> PIL -> RGB -> resize -> normalize -> MobileNetV2 preprocessing
         """
         try:
+            logger.info("🔄 Starting image preprocessing...")
+            
             if not TF_AVAILABLE:
                 raise RuntimeError("TensorFlow not available for preprocessing")
             
-            # Step 1: Decode image
+            # Step 1: Load image with PIL (more reliable than OpenCV)
             if isinstance(image_data, bytes):
-                arr = np.frombuffer(image_data, np.uint8)
-                img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                logger.info(f"📥 Loading image from bytes (size: {len(image_data)} bytes)")
+                img = Image.open(io.BytesIO(image_data))
             else:
-                img = image_data
+                logger.info("📥 Loading image from numpy array")
+                if isinstance(image_data, np.ndarray):
+                    img = Image.fromarray(image_data)
+                else:
+                    img = image_data
 
-            if img is None:
-                raise ValueError("Failed to decode image")
-
-            # Step 2: Convert BGR to RGB (critical for correct predictions)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # Step 2: Convert to RGB (critical for correct predictions)
+            if img.mode != 'RGB':
+                logger.info(f"🎨 Converting from {img.mode} to RGB")
+                img = img.convert('RGB')
+            else:
+                logger.info("✅ Image already in RGB mode")
             
-            # Step 3: Resize to target size
-            img = cv2.resize(img, self.TARGET_SIZE, interpolation=cv2.INTER_AREA)
+            logger.info(f"📐 Original image size: {img.size}")
             
-            # Step 4: Convert to float32 and normalize to [0, 1]
-            img = img.astype(np.float32) / 255.0
+            # Step 3: Resize to target size (224, 224)
+            img = img.resize(self.TARGET_SIZE, Image.Resampling.LANCZOS)
+            logger.info(f"📏 Resized to: {img.size}")
             
-            # Step 5: Apply MobileNetV2 preprocessing (converts [0,1] to [-1,1])
+            # Step 4: Convert to numpy array
+            img_array = np.array(img, dtype=np.float32)
+            logger.info(f"🔢 Numpy array shape: {img_array.shape}, dtype: {img_array.dtype}")
+            logger.info(f"📊 Pixel value range: [{img_array.min():.1f}, {img_array.max():.1f}]")
+            
+            # Step 5: Apply MobileNetV2 preprocessing
+            # MobileNetV2 expects values in [0, 255] range, then converts to [-1, 1]
             from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-            img = preprocess_input(img * 255.0)  # preprocess_input expects [0,255]
+            img_array = preprocess_input(img_array)
+            
+            logger.info(f"🧠 After MobileNetV2 preprocessing: [{img_array.min():.3f}, {img_array.max():.3f}]")
             
             # Step 6: Add batch dimension
-            img = np.expand_dims(img, axis=0)
+            img_array = np.expand_dims(img_array, axis=0)
+            logger.info(f"📦 Final shape with batch dimension: {img_array.shape}")
             
-            logger.debug(f"Preprocessed image shape: {img.shape}, dtype: {img.dtype}, range: [{img.min():.3f}, {img.max():.3f}]")
-            return img
+            logger.info("✅ Image preprocessing completed successfully")
+            return img_array
             
         except Exception as e:
-            logger.error(f"Image preprocessing failed: {e}")
+            logger.error(f"❌ Image preprocessing failed: {e}")
+            logger.error(f"🔍 Traceback: {traceback.format_exc()}")
             raise RuntimeError(f"Image preprocessing failed: {e}")
 
     def predict_single(self, image_data: Union[bytes, np.ndarray]) -> Tuple[str, float]:
         """
-        Predict REAL/FAKE for a single image.
-        
-        Model output interpretation:
-        - Raw score close to 1.0 = REAL product
-        - Raw score close to 0.0 = FAKE product
-        - Threshold: 0.7 (adjusted for better accuracy)
-        
-        Returns:
-            (label, confidence) where confidence is the probability of the predicted class
+        Predict REAL/FAKE for a single image with detailed debugging.
         """
         try:
+            logger.info("🚀 Starting prediction...")
+            
             if self.model is None:
                 raise RuntimeError("Model not loaded")
             
             # Preprocess image
+            logger.info("🔄 Preprocessing image...")
             processed = self.preprocess_image(image_data)
             
-            # Get prediction
-            raw_score = float(self.model.predict(processed, verbose=0)[0][0])
+            # Get raw prediction
+            logger.info("🧠 Running model inference...")
+            raw_prediction = self.model.predict(processed, verbose=0)
+            raw_score = float(raw_prediction[0][0])
             
-            # Use adjusted threshold for better accuracy
-            threshold = 0.7  # Higher threshold for more conservative REAL predictions
+            logger.info(f"📊 Raw model output: {raw_score:.6f}")
+            logger.info(f"📊 Prediction array shape: {raw_prediction.shape}")
+            logger.info(f"📊 Full prediction array: {raw_prediction[0]}")
             
-            # Determine label and confidence
+            # Apply threshold logic
+            # Lower threshold for testing - if still always Fake, it's a preprocessing issue
+            threshold = 0.3  # Lowered from 0.7 for debugging
+            
             if raw_score >= threshold:
                 label = "REAL"
                 confidence = raw_score
+                logger.info(f"✅ REAL prediction: score {raw_score:.6f} >= threshold {threshold}")
             else:
                 label = "FAKE"
                 confidence = 1.0 - raw_score
+                logger.info(f"❌ FAKE prediction: score {raw_score:.6f} < threshold {threshold}")
             
-            # Log prediction details
-            logger.info(
-                f"🔍 Prediction: raw_score={raw_score:.4f}, threshold={threshold:.4f} "
-                f"→ {label} (confidence={confidence:.4f})"
-            )
-            
+            logger.info(f"🎯 Final result: {label} (confidence: {confidence:.6f})")
             return label, confidence
             
         except Exception as e:
-            logger.error(f"Prediction failed: {e}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Prediction failed: {e}")
+            logger.error(f"🔍 Traceback: {traceback.format_exc()}")
             # Return conservative fallback
-            return "FAKE", 0.3
+            return "FAKE", 0.1
 
 
 # ──────────────────────────────────────────────────────────────────────────────
