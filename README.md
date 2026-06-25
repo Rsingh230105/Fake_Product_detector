@@ -216,7 +216,7 @@ This project is for educational and research purposes.
 
 ## Contributors
 
-Developed as part of Major Project - Food Product Authentication System.
+Developed as part of Major Project - Product Authentication System.
 
 ---
 
