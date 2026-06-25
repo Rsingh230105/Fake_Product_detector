@@ -14,7 +14,7 @@ webapp_dir = Path(__file__).parent / "webapp"
 sys.path.insert(0, str(webapp_dir))
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'food_detection.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_product_verification_system.settings')
 django.setup()
 
 def test_ml_model():

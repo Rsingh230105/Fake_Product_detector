@@ -1,6 +1,6 @@
 @echo off
 echo ================================
-echo  Deploying Fake Product Detector
+echo  Deploying AI Product Verification System
 echo ================================
 
 echo.

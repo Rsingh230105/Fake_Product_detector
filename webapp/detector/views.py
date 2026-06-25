@@ -189,7 +189,7 @@ class ForgotPasswordView(View):
         If you didn't request this, please ignore this email.
 
         Best regards,
-        Food Detection Team
+        AI Product Verification Team
         '''
         
         try:
@@ -557,15 +557,15 @@ class DeleteMediaView(UserPassesTestMixin, View):
 
 # API Views
 class FoodDetectorView(APIView):
-    """API endpoint for food detection"""
+    """API endpoint for product verification"""
     parser_classes = (MultiPartParser, FormParser)
 
     def get(self, request, *args, **kwargs):
         return Response({
-            'message': 'Welcome to the Food Detection API',
+            'message': 'Welcome to the AI Product Verification System API',
             'endpoints': {
                 'POST /api/detect/': {
-                    'description': 'Detect fake/real food from multiple images',
+                    'description': 'Detect product authenticity from multiple images',
                     'parameters': {
                         'brand_name': 'Name of the food product',
                         'images': 'Multiple image files (JPEG/PNG)',
@@ -711,7 +711,7 @@ class FoodDetectorView(APIView):
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            logger.error(f"Error processing food detection request: {str(e)}")
+            logger.error(f"Error processing product verification request: {str(e)}")
             return Response({'error': 'Internal server error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

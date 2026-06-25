@@ -1,5 +1,5 @@
 """
-URL configuration for food_detection project.
+URL configuration for ai_product_verification_system project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/5.2/topics/http/urls/

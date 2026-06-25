@@ -1,1 +1,1 @@
-web: cd webapp && gunicorn food_detection.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info
+web: cd webapp && gunicorn ai_product_verification_system.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info

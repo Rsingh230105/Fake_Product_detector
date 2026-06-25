@@ -159,6 +159,6 @@ class UserActivityAdmin(admin.ModelAdmin):
         return False  # Prevent editing of activities
 
 # Customize admin site
-admin.site.site_header = "Fake Product Detector Admin"
+admin.site.site_header = "AI Product Verification System Admin"
 admin.site.site_title = "FPD Admin"
-admin.site.index_title = "Welcome to Fake Product Detector Administration"
+admin.site.index_title = "Welcome to AI Product Verification System Administration"
