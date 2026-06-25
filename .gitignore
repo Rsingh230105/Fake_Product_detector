@@ -1,41 +1,43 @@
 # Python
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
 *.pyc
 *.pyo
-__pycache__/
-*.egg-info/
-dist/
-build/
 
-# Virtual Environment
+# Virtual environments
 venv/
 env/
 ENV/
 .venv/
 
+# Build / packaging
+build/
+dist/
+*.egg-info/
+wheels/
+
 # Django
 *.log
 db.sqlite3
 db.sqlite3-journal
-staticfiles/
-media/
-*.pot
+/staticfiles/
+/media/
 local_settings.py
 
-# Environment Variables
+# Environment files
 .env
 .env.local
 .env.*.local
 webapp/.env
 
-# ML Models & Datasets
+# Models, data, and large artifacts
 models/
 data/
 dataset/
-raw_data/
 training_data/
+raw_data/
 processed_dataset/
 *.h5
 *.keras
@@ -45,30 +47,25 @@ processed_dataset/
 *.pth
 *.pt
 
-# Logs
+# Logs and telemetry
 logs/
-*.log
 debug.log
 
 # TensorBoard
 runs/
 tensorboard/
 
-# Jupyter Notebook
+# Jupyter
 .ipynb_checkpoints
 *.ipynb
 
-# IDE
+# IDEs
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
 
 # OS
 .DS_Store
 Thumbs.db
-*.bak
 
 # Testing
 .coverage
@@ -81,14 +78,14 @@ htmlcov/
 temp/
 tmp/
 
-# Credentials
+# Credentials / secrets
 *.pem
 *.key
 credentials.json
 secrets.json
 ADMIN_CREDENTIALS.txt
 
-# Internal documentation
+# Documentation and internal reports (optional)
 COMPLETION_SUMMARY.md
 PROJECT_STATUS_REPORT.txt
 QUICK_REFERENCE.md
@@ -100,15 +97,19 @@ QUICK_START_TRAINING.md
 TRAINING_SUMMARY.txt
 model_pipeline/TRAINING_GUIDE.md
 
-# Local scripts & generated files
-run_server.bat
-PUSH_TO_GITHUB.bat
-deploy.bat
-health_check.py
-train_model.bat
+# Scripts and small helpers (do not ignore core scripts needed in repo)
+# run_server.bat
+# PUSH_TO_GITHUB.bat
+# deploy.bat
+# health_check.py
+# train_model.bat
 
 # Large media files
 *.mp4
 *.avi
 *.mov
 *.mkv
+
+# Build artifacts
+*.sh
+*.bat
