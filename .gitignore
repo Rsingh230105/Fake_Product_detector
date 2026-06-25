@@ -110,6 +110,9 @@ model_pipeline/TRAINING_GUIDE.md
 *.mov
 *.mkv
 
+# Legacy project folders
+Fake_Real_Major/Project_Major_food/
+
 # Build artifacts
 *.sh
 *.bat
