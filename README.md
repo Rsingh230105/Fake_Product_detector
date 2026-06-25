@@ -1,4 +1,4 @@
-# Food Product Authenticity Detection System
+# Product Authenticity Detection System
 
 AI-powered web application for detecting counterfeit food products using deep learning, OCR, and barcode verification.
 
