@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     # Third party
     'rest_framework',
     'corsheaders',
+    'storages',
 
     # Local
     'detector.apps.DetectorConfig',
@@ -99,6 +100,16 @@ TEMPLATES = [
         },
     },
 ]
+DATABASES = {
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
+        "NAME": os.getenv("DB_NAME", str(BASE_DIR / "db.sqlite3")),
+        "USER": os.getenv("DB_USER", ""),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", ""),
+        "PORT": os.getenv("DB_PORT", ""),
+    }
+}
 
 WSGI_APPLICATION = "ai_product_verification_system.wsgi.application"
 
@@ -106,12 +117,12 @@ WSGI_APPLICATION = "ai_product_verification_system.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+#DATABASES = {
+    #"default": {
+   #     "ENGINE": "django.db.backends.sqlite3",
+  #      "NAME": BASE_DIR / "db.sqlite3",
+ #   }
+#}
 
 
 # Password validation
@@ -121,8 +132,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+    {        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -136,7 +146,6 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
 
@@ -151,8 +160,26 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Media files (user uploads — not served by WhiteNoise)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+#MEDIA_URL = '/media/'
+#MEDIA_ROOT = BASE_DIR / 'media'
+
+# Media files — S3 storage (falls back to local if USE_S3 not set, for local dev)
+USE_S3 = os.getenv('USE_S3', 'False').lower() == 'true'
+
+if USE_S3:
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'ap-south-1')
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+    AWS_DEFAULT_ACL = None
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    AWS_LOCATION = 'media'
+else:
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # WhiteNoise — compress and cache static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
@@ -219,7 +246,8 @@ REST_FRAMEWORK = {
 # Security headers — only enforce HTTPS-related headers in production.
 # NOTE: SECURE_SSL_REDIRECT is intentionally OFF because Render terminates
 # SSL at its load balancer. Enabling it would cause redirect loops.
-if not DEBUG:
+USE_HTTPS = os.getenv('DJANGO_USE_HTTPS', 'False').lower() == 'true'
+if not DEBUG and USE_HTTPS:# Tesseract OCR
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -233,7 +261,7 @@ ML_MODEL_PATH = os.getenv(
     str(BASE_DIR.parent / 'models' / 'mobilenet_v2_food_production.keras')
 )
 
-# Tesseract OCR
+
 # Linux (Render): /usr/bin/tesseract  — installed via apt in build.sh
 # Windows (local): C:\Program Files\Tesseract-OCR\tesseract.exe
 TESSERACT_CMD = os.getenv('TESSERACT_CMD', '/usr/bin/tesseract')
