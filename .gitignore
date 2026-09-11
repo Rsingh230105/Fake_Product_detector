@@ -116,3 +116,7 @@ Fake_Real_Major/
 # Build artifacts
 *.sh
 *.bat
+
+# Runtime-generated Django files
+webapp/media/
+webapp/staticfiles/
