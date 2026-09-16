@@ -1,0 +1,34 @@
+# Virtual environment
+venv/
+webapp/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Secrets — NEVER copy into image
+webapp/.env
+.env.*
+!.env.example
+
+# Local database
+webapp/db.sqlite3
+
+# Git
+.git/
+.gitignore
+
+# Local ML model (unknown version) + training pipeline (not needed in production)
+models/
+model_pipeline/
+
+# Already-collected static (regenerated fresh in container)
+webapp/staticfiles/
+
+# Media uploads (S3 handles this in production)
+webapp/media/
+
+# OS/editor files
+.vscode/
+.idea/
+*.DS_Store

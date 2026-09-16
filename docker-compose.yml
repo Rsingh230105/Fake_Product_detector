@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: local-postgres
+    environment:
+      POSTGRES_DB: fakeproduct
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localtest123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    # image: rajendrasingh23012005/fake_product_detector-web:latest
+    container_name: fake-product-container
+    env_file:
+      - webapp/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
