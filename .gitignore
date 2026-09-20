@@ -115,6 +115,7 @@ Fake_Real_Major/
 
 # Build artifacts
 *.sh
+!entrypoint.sh
 *.bat
 
 # Runtime-generated Django files

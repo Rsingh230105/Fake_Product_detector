@@ -16,7 +16,9 @@ services:
       timeout: 5s
       retries: 5
 
+
   web:
+    # image: fake-product-detector:multistage
     build: .
     # image: rajendrasingh23012005/fake_product_detector-web:latest
     container_name: fake-product-container

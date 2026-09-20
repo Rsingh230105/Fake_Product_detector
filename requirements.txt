@@ -1,12 +1,15 @@
 # ── Django ────────────────────────────────────────────────────────────────────
-Django==4.2
-djangorestframework==3.14.0
+# Django==4.2
+Django==4.2.26
+# djangorestframework==3.14.0
+djangorestframework==3.17.2
 django-cors-headers==4.1.0
 django-phonenumber-field==8.4.0
 phonenumbers==9.0.24
 
 # ── Production Server ─────────────────────────────────────────────────────────
-gunicorn==21.2.0
+# gunicorn==21.2.0
+gunicorn==23.0.0
 
 # ── ML / Deep Learning (FIXED VERSIONS) ──────────────────────────────────────
 # Compatible versions that work together
@@ -30,7 +33,9 @@ Levenshtein==0.27.3
 whitenoise==6.11.0
 
 # ── Environment & Config ──────────────────────────────────────────────────────
-python-dotenv==1.0.0
+# python-dotenv==1.0.0
+python-dotenv==1.2.2
+
 # gdown==5.2.0
 psycopg2-binary==2.9.9
 django-storages==1.14.2
