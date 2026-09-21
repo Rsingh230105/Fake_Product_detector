@@ -121,3 +121,7 @@ Fake_Real_Major/
 # Runtime-generated Django files
 webapp/media/
 webapp/staticfiles/
+
+
+##terraform 
+terraform.tfstate

@@ -34,10 +34,21 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
+      - name: Find current EC2 instance dynamically
+        id: find-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=fake-product-detector-ec2" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text \
+            --region ap-south-1)
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+          echo "Found instance: $INSTANCE_ID"
+
       - name: Deploy via SSM
         run: |
           aws ssm send-command \
-            --instance-ids "i-0f084632af44dd786" \
+            --instance-ids "${{ steps.find-instance.outputs.instance_id }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters '{"commands":["docker pull rajendrasingh23012005/fake_product_detector-web:multistage","cd /home/ubuntu && docker compose up -d --force-recreate","docker image prune -f"]}' \
+            --parameters '{"commands":["docker pull rajendrasingh23012005/fake_product_detector-web:multistage","cd /opt/fake-product-detector && docker compose up -d --force-recreate","docker image prune -f"]}' \
             --region ap-south-1
